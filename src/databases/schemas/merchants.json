@@ -1,0 +1,10 @@
+{
+  "collection": "merchants",
+  "schema": {
+    "uid": "string",
+    "name": "string",
+    "phone": "string",
+    "shortcode": "string",
+    "createdAt": "timestamp"
+  }
+}
