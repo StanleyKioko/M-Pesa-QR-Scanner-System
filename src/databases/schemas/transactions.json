@@ -1,0 +1,18 @@
+{
+  "collection": "transactions",
+  "schema": {
+    "merchantId": "string",
+    "transactionRef": "string",
+    "phoneNumber": "string",
+    "amount": "number",
+    "status": "string",
+    "createdAt": "timestamp",
+    "updatedAt": "timestamp",
+    "mpesaResult": {
+      "MerchantRequestID": "string",
+      "CheckoutRequestID": "string",
+      "ResultCode": "number",
+      "ResultDesc": "string"
+    }
+  }
+}
