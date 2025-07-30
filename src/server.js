@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/auth");
+const transactionsRoutes = require("./routes/transactions");
 const darajaRoutes = require("./routes/daraja");
 
 const app = express();
@@ -12,6 +13,7 @@ app.use(express.json());
 // Routes
 app.use("/auth", authRoutes);
 app.use("/daraja", darajaRoutes);
+app.use("/transactions", transactionsRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
