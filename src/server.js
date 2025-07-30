@@ -1,3 +1,4 @@
+require('dotenv').config(); // Ensure environment variables are loaded
 const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/auth");
