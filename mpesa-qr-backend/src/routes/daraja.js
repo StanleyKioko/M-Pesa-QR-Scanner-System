@@ -1,10 +1,8 @@
-const express = require("express");
-const { triggerSTKPush, handleSTKCallback } = require("../controllers/daraja");
-const { verifyToken } = require('../middlewares/auth');
-
+const express = require('express');
 const router = express.Router();
+const { triggerSTKPush } = require('../controllers/daraja');
 
-router.post("/scan-qr", verifyToken, triggerSTKPush);
-router.post("/stk-callback", handleSTKCallback);
+// POST /daraja/stkpush
+router.post('/stkpush', triggerSTKPush);
 
 module.exports = router;

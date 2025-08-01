@@ -27,6 +27,7 @@ function QRScanner({ token }) {
       });
       setMessage(`STK Push Initiated: ${response.data.data.CheckoutRequestID}`);
     } catch (err) {
+      console.error('QRScanner error:', err.response?.data || err.message);
       setError(err.response?.data?.error || 'Failed to initiate STK push');
     }
   };
@@ -42,7 +43,7 @@ function QRScanner({ token }) {
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             className="w-full p-2 border rounded"
-            placeholder="254708374149"
+            placeholder="254708967800"
           />
         </div>
         <div className="mb-4">
@@ -63,6 +64,6 @@ function QRScanner({ token }) {
       </form>
     </div>
   );
-  }
+}
 
-  export default QRScanner;
+export default QRScanner;

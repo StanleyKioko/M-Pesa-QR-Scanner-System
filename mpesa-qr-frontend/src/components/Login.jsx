@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 function Login({ setToken }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -14,10 +16,23 @@ function Login({ setToken }) {
       const idToken = await userCredential.user.getIdToken();
       setToken(idToken);
       setError('');
+      navigate('/');
     } catch (err) {
       setError('Failed to login: ' + err.message);
     }
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const newToken = await user.getIdToken();
+        setToken(newToken);
+      } else {
+        setToken(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [setToken]);
 
   return (
     <div className="container mx-auto p-4">
@@ -49,6 +64,6 @@ function Login({ setToken }) {
       </form>
     </div>
   );
-  }
+}
 
-  export default Login;
+export default Login;

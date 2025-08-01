@@ -1,130 +1,175 @@
-const axios = require("axios");
-const { db, admin } = require("../config/firestore");
-const DARAJA_API_URL = process.env.NODE_ENV === "development" ? "https://sandbox.safaricom.co.ke" : "https://api.safaricom.co.ke";
+require('dotenv').config();
 
-// Generate Daraja API access token
-async function getDarajaToken() {
-  const auth = Buffer.from(`${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`).toString("base64");
-  try {
-    const response = await axios.get(`${DARAJA_API_URL}/oauth/v1/generate?grant_type=client_credentials`, {
-      headers: { Authorization: `Basic ${auth}` },
-    });
-    return response.data.access_token;
-  } catch (error) {
-    const errorDetails = {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-    };
-    throw new Error(`Failed to generate Daraja token: ${errorDetails.message} (Status: ${errorDetails.status})`);
+const axios = require('axios');
+const { admin, db } = require('../config/firebase');
+
+// Helper to check required env vars
+function checkEnvVars() {
+  const required = [
+    'MPESA_CONSUMER_KEY',
+    'MPESA_CONSUMER_SECRET',
+    'MPESA_SHORTCODE',
+    'MPESA_PASSKEY',
+    'SERVER_URL'
+  ];
+  for (const key of required) {
+    if (!process.env[key]) {
+      throw new Error(`Missing required environment variable: ${key}`);
+    }
   }
 }
 
-// Trigger M-Pesa STK push
+// Generate M-Pesa access token
+async function generateAccessToken() {
+  checkEnvVars();
+  let auth = Buffer.from(`${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`).toString('base64');
+  auth = auth.replace(/(\r\n|\n|\r)/gm, ''); // Remove any line breaks
+  try {
+    const response = await axios.get(
+      'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+      {
+        headers: { Authorization: `Basic ${auth}` },
+      }
+    );
+    if (!response.data.access_token) {
+      throw new Error('No access token in response');
+    }
+    console.log('Access Token:', response.data.access_token);
+    return response.data.access_token;
+  } catch (error) {
+    console.error('generateAccessToken error:', error.response?.data || error.message);
+    throw new Error(`Failed to generate access token: ${error.response?.data?.errorMessage || error.message}`);
+  }
+}
+
+// Trigger STK Push and store in Firestore
 async function triggerSTKPush(req, res) {
   const { phoneNumber, amount } = req.body;
-  const merchantId = req.user.uid;
-
-  // Validate input
   if (!phoneNumber || !amount) {
-    return res.status(400).json({ error: "Phone number and amount are required" });
+    return res.status(400).json({ error: 'Phone number and amount are required' });
   }
-  if (!/^\d{12}$/.test(phoneNumber) || phoneNumber.slice(0, 3) !== "254") {
-    return res.status(400).json({ error: "Phone number must be 12 digits starting with 254" });
-  }
-  const parsedAmount = parseFloat(amount);
-  if (isNaN(parsedAmount) || parsedAmount <= 0) {
-    return res.status(400).json({ error: "Amount must be a positive number" });
+
+  // Validate phone number format
+  if (!/^2547\d{8}$/.test(phoneNumber)) {
+    return res.status(400).json({ error: 'Phone number must be in format 2547XXXXXXXX' });
   }
 
   try {
-    // Verify merchant exists
-    const merchantDoc = await db.collection("merchants").doc(merchantId).get();
-    if (!merchantDoc.exists) {
-      return res.status(404).json({ error: "Merchant not found" });
-    }
+    const accessToken = await generateAccessToken();
+    const now = new Date();
+    const timestamp = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0'); // YYYYMMDDHHMMSS
 
-    // Generate token and prepare STK push
-    const token = await getDarajaToken();
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
-    const password = Buffer.from(`${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`).toString("base64");
-    const transactionRef = `QR_${Date.now()}`;
+    const password = Buffer.from(
+      `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`
+    ).toString('base64');
 
     const payload = {
       BusinessShortCode: process.env.MPESA_SHORTCODE,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: parsedAmount,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: amount,
       PartyA: phoneNumber,
       PartyB: process.env.MPESA_SHORTCODE,
       PhoneNumber: phoneNumber,
-      CallBackURL: `${process.env.SERVER_URL}/daraja/stk-callback`,
-      AccountReference: transactionRef,
-      TransactionDesc: "Payment for QR scan",
+      CallBackURL: `${process.env.SERVER_URL}/daraja/callback`,
+      AccountReference: `QR_${timestamp}`,
+      TransactionDesc: 'Payment via QR code',
     };
 
-    // Send STK push request
-    const response = await axios.post(`${DARAJA_API_URL}/mpesa/stkpush/v1/processrequest`, payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    console.log('STK Push Payload:', JSON.stringify(payload, null, 2));
+
+    const response = await axios.post(
+      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log('STK Push Response:', response.data);
 
     // Store transaction in Firestore
-    await db.collection("transactions").add({
-      merchantId,
-      transactionRef,
+    const docRef = await db.collection('transactions').add({
       phoneNumber,
-      amount: parsedAmount,
-      status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      amount,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      mpesa: response.data,
+      status: response.data.ResponseCode === '0' ? 'pending' : 'failed',
+      CheckoutRequestID: response.data.CheckoutRequestID || null
     });
 
-    return res.status(200).json({
-      status: "success",
-      message: "STK push initiated",
-      data: response.data,
-    });
-  } catch (error) {
-    const errorMessage = error.response?.data?.errorMessage || error.message;
-    const statusCode = error.response?.status || 500;
-    return res.status(statusCode).json({ error: `Failed to initiate STK push: ${errorMessage}` });
-  }
-}
-
-// Handle M-Pesa STK callback
-async function handleSTKCallback(req, res) {
-  const callbackData = req.body.Body?.stkCallback;
-  if (!callbackData) {
-    return res.status(400).json({ error: "Invalid callback data" });
-  }
-
-  const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = callbackData;
-  const transactionRef = CallbackMetadata?.Item.find(item => item.Name === "AccountReference")?.Value;
-
-  if (!transactionRef) {
-    return res.status(400).json({ error: "Transaction reference not found in callback" });
-  }
-
-  try {
-    // Find transaction in Firestore
-    const transactionQuery = await db.collection("transactions").where("transactionRef", "==", transactionRef).get();
-    if (transactionQuery.empty) {
-      return res.status(404).json({ error: "Transaction not found" });
+    // Check for error in response
+    if (response.data.errorCode || response.data.errorMessage) {
+      return res.status(500).json({
+        error: response.data.errorMessage || 'STK push error',
+        details: response.data
+      });
     }
 
-    // Update transaction status
-    const transactionDoc = transactionQuery.docs[0];
-    await transactionDoc.ref.update({
-      status: ResultCode === 0 ? "paid" : "failed",
-      mpesaResult: { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return res.status(200).json({ message: "Callback processed" });
+    res.status(200).json({ status: 'success', data: response.data, transactionId: docRef.id });
   } catch (error) {
-    return res.status(500).json({ error: `Failed to process callback: ${error.message}` });
+    // Log full error for debugging
+    if (error.response) {
+      console.error('triggerSTKPush error:', error.response.data);
+      return res.status(500).json({
+        error: error.response.data.errorMessage || 'Failed to initiate STK push',
+        details: error.response.data
+      });
+    } else {
+      console.error('triggerSTKPush error:', error.message);
+      return res.status(500).json({
+        error: error.message || 'Failed to initiate STK push'
+      });
+    }
   }
 }
 
-module.exports = { triggerSTKPush, handleSTKCallback };
+// Handle M-Pesa callback and update transaction status
+async function handleCallback(req, res) {
+  try {
+    const callbackData = req.body;
+    console.log('Callback received:', JSON.stringify(callbackData, null, 2));
+
+    // Find transaction by CheckoutRequestID and update status
+    if (callbackData.Body && callbackData.Body.stkCallback) {
+      const checkoutRequestID = callbackData.Body.stkCallback.CheckoutRequestID;
+      const status = callbackData.Body.stkCallback.ResultCode === 0 ? 'success' : 'failed';
+
+      // Find the transaction and update
+      const transactionsRef = db.collection('transactions');
+      const snapshot = await transactionsRef.where('CheckoutRequestID', '==', checkoutRequestID).get();
+
+      if (!snapshot.empty) {
+        snapshot.forEach(async (doc) => {
+          await doc.ref.update({
+            status,
+            callback: callbackData,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log(`Transaction ${doc.id} updated with status: ${status}`);
+        });
+      } else {
+        console.log(`No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
+      }
+    } else {
+      console.log('Invalid callback data format');
+      return res.status(400).json({ error: 'Invalid callback data format' });
+    }
+
+    res.status(200).json({ status: 'success' });
+  } catch (err) {
+    console.error('Callback update error:', err);
+    res.status(500).json({ error: 'Failed to update transaction status' });
+  }
+}
+
+module.exports = { triggerSTKPush, handleCallback };

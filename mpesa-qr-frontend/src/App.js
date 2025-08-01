@@ -14,7 +14,7 @@ function App() {
           <div className="container mx-auto flex justify-between">
             <h1 className="text-white text-2xl font-bold">M-Pesa QR</h1>
             <div>
-              <Link to="/" className="text-white mx-4">QR Scanner</Link>
+              <Link to="/" className="text-white mx-4 text-center">QR Scanner</Link>
               <Link to="/transactions" className="text-white mx-4">Transactions</Link>
               {!token && <Link to="/login" className="text-white mx-4">Login</Link>}
               {token && <button onClick={() => setToken(null)} className="text-white mx-4">Logout</button>}
