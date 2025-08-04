@@ -1,3 +1,64 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* QR Scanner specific styles */
+.qr-scanner-container {
+  @apply w-full max-w-lg mx-auto;
+}
+
+.scanner-wrapper {
+  @apply border-2 border-dashed border-gray-300 rounded-lg p-4;
+}
+
+#qr-reader {
+  @apply w-full;
+}
+
+#qr-reader__dashboard_section {
+  @apply hidden; /* Hide the file input section */
+}
+
+#qr-reader__camera_selection {
+  @apply mb-4;
+}
+
+#qr-reader__scan_region {
+  @apply border-2 border-blue-500 rounded-lg overflow-hidden;
+}
+
+#qr-reader__scan_region video {
+  @apply w-full h-auto;
+}
+
+/* Custom button styles */
+.qr-button {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+}
+
+.qr-button-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.qr-button-secondary {
+  @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+}
+
+.qr-button-success {
+  @apply bg-green-600 text-white hover:bg-green-700;
+}
+
+.qr-button-danger {
+  @apply bg-red-600 text-white hover:bg-red-700;
+}
+
+/* Animation for scan success */
+@keyframes scanSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.scan-success {
+  animation: scanSuccess 0.3s ease-in-out;
+}
