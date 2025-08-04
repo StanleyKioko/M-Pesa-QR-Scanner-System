@@ -2,7 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
+
+// Import routes
+const authRoutes = require('./routes/auth');
 const darajaRoutes = require('./routes/daraja');
+const transactionRoutes = require('./routes/transactions');
 
 // Middleware
 app.use(cors());
@@ -10,8 +14,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/daraja', darajaRoutes);
-app.use('/api', darajaRoutes); // Add this for the frontend endpoint
+app.use('/auth', authRoutes);          // Authentication routes
+app.use('/daraja', darajaRoutes);      // M-Pesa routes  
+app.use('/transactions', transactionRoutes); // Transaction routes
+app.use('/api', darajaRoutes);         // Alternative API endpoint
 
 // Test route
 app.get('/', (req, res) => {
