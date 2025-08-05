@@ -57,22 +57,22 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
   // Merchant payment function (requires authentication)
   const triggerMerchantPayment = async (paymentRequest) => {
     try {
-      console.log('🚀 Starting MERCHANT payment request...');
+      console.log('Starting MERCHANT payment request...');
       
       // Get a fresh token if getValidToken function is available
       let validToken = token;
       if (getValidToken) {
-        console.log('🔄 Getting fresh token...');
+        console.log('Getting fresh token...');
         validToken = await getValidToken();
         if (!validToken) {
           throw new Error('Failed to get valid authentication token');
         }
       }
       
-      console.log('📧 Token present:', !!validToken);
-      console.log('🌐 API_BASE_URL:', API_BASE_URL);
-      console.log('📤 Merchant payment request data:', paymentRequest);
-      
+      console.log('Token present:', !!validToken);
+      console.log('API_BASE_URL:', API_BASE_URL);
+      console.log('Merchant payment request data:', paymentRequest);
+
       // Verify we have a token
       if (!validToken) {
         throw new Error('No authentication token available');
@@ -90,11 +90,11 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
         }
       );
       
-      console.log('📥 Merchant payment response received:', response.data);
+      console.log('Merchant payment response received:', response.data);
 
       // Check for successful status in response
       if (response.data.status === 'success') {
-        console.log('✅ Merchant payment initiated successfully');
+        console.log('Merchant payment initiated successfully');
         
         // Extract the correct data structure from backend response
         const backendData = response.data;
@@ -112,14 +112,14 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
           }
         };
       } else {
-        console.log('❌ Merchant payment failed with response:', response.data);
+        console.log('Merchant payment failed with response:', response.data);
         return {
           success: false,
           error: response.data.error || response.data.message || 'Payment initiation failed'
         };
       }
     } catch (err) {
-      console.error('💥 Merchant payment request error:', {
+      console.error('Merchant payment request error:', {
         message: err.message,
         response: err.response?.data,
         status: err.response?.status,
@@ -151,8 +151,8 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
   // Customer payment function (no authentication required)
   const triggerCustomerPayment = async (paymentRequest) => {
     try {
-      console.log('🚀 Starting CUSTOMER payment request...');
-      console.log('📤 Customer payment data:', paymentRequest);
+      console.log('Starting CUSTOMER payment request...');
+      console.log('Customer payment data:', paymentRequest);
       
       const response = await axios.post(
         `${API_BASE_URL}/daraja/customer-payment`,
@@ -166,10 +166,10 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
         }
       );
       
-      console.log('📥 Customer payment response received:', response.data);
+      console.log('Customer payment response received:', response.data);
 
       if (response.data.success) {
-        console.log('✅ Customer payment initiated successfully');
+        console.log('Customer payment initiated successfully');
         
         return {
           success: true,
@@ -182,14 +182,14 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
           }
         };
       } else {
-        console.log('❌ Customer payment failed with response:', response.data);
+        console.log('Customer payment failed with response:', response.data);
         return {
           success: false,
           error: response.data.message || 'Payment initiation failed'
         };
       }
     } catch (err) {
-      console.error('💥 Customer payment request error:', {
+      console.error('Customer payment request error:', {
         message: err.message,
         response: err.response?.data,
         status: err.response?.status,
@@ -218,7 +218,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
   };
 
   const handleManualPayment = async () => {
-    console.log('📝 Manual payment initiated');
+    console.log('Manual payment initiated');
     
     if (!phoneNumber || !amount) {
       setError("Phone number and amount are required");
@@ -248,7 +248,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
 
       // For customer mode - trigger STK push to customer's phone
       if (userRole === 'customer' || !token) {
-        console.log('👤 Customer mode - triggering STK push to customer phone');
+        console.log('Customer mode - triggering STK push to customer phone');
         
         // FIXED: Add the required qrData field
         const customerPaymentRequest = {
@@ -271,10 +271,10 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
             isCustomerPayment: true
           };
           
-          console.log('✅ Customer payment initiated successfully:', enhancedPaymentData);
+          console.log('Customer payment initiated successfully:', enhancedPaymentData);
           onPaymentInitiated(enhancedPaymentData);
         } else {
-          console.log('❌ Customer payment failed:', result.error);
+          console.log('Customer payment failed:', result.error);
           setError(`Payment failed: ${result.error}`);
         }
         return;
@@ -288,7 +288,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
         description: merchantName || 'Manual QR Payment'
       };
 
-      console.log('🔐 Merchant mode - calling backend with authentication');
+      console.log('Merchant mode - calling backend with authentication');
       const result = await triggerMerchantPayment(paymentRequest);
 
       if (result.success) {
@@ -299,14 +299,14 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
           isMerchantPayment: true
         };
         
-        console.log('✅ Merchant payment initiated successfully:', enhancedPaymentData);
+        console.log('Merchant payment initiated successfully:', enhancedPaymentData);
         onPaymentInitiated(enhancedPaymentData);
       } else {
-        console.log('❌ Merchant payment failed:', result.error);
+        console.log('Merchant payment failed:', result.error);
         setError(`Payment failed: ${result.error}`);
       }
     } catch (err) {
-      console.error('💥 Manual payment error:', err);
+      console.error('Manual payment error:', err);
       setError(`Payment failed: ${err.message}`);
     } finally {
       setLoading(false);
@@ -314,7 +314,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
   };
 
   const handleQRPayment = async () => {
-    console.log('📱 QR payment initiated');
+    console.log('QR payment initiated');
     
     if (!qrData || !qrData.isValid) {
       setError("Invalid QR code data");
@@ -334,7 +334,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
 
       // For customer mode - trigger STK push to customer's phone
       if (userRole === 'customer' || !token) {
-        console.log('👤 Customer QR payment - triggering STK push to customer phone');
+        console.log('Customer QR payment - triggering STK push to customer phone');
         
         const customerPaymentRequest = {
           phoneNumber: phoneNumber.trim(),
@@ -356,10 +356,10 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
             isCustomerPayment: true
           };
           
-          console.log('✅ Customer QR payment initiated successfully:', enhancedPaymentData);
+          console.log('Customer QR payment initiated successfully:', enhancedPaymentData);
           onPaymentInitiated(enhancedPaymentData);
         } else {
-          console.log('❌ Customer QR payment failed:', result.error);
+          console.log('Customer QR payment failed:', result.error);
           setError(`Payment failed: ${result.error}`);
         }
         return;
@@ -373,7 +373,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
         description: qrData.description || merchantName || 'QR Payment'
       };
 
-      console.log('🔐 Merchant QR payment - calling backend with authentication');
+      console.log('Merchant QR payment - calling backend with authentication');
       const result = await triggerMerchantPayment(paymentRequest);
 
       if (result.success) {
@@ -384,14 +384,14 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
           isMerchantPayment: true
         };
         
-        console.log('✅ Merchant QR payment initiated successfully:', enhancedPaymentData);
+        console.log('Merchant QR payment initiated successfully:', enhancedPaymentData);
         onPaymentInitiated(enhancedPaymentData);
       } else {
-        console.log('❌ Merchant QR payment failed:', result.error);
+        console.log('Merchant QR payment failed:', result.error);
         setError(`Payment failed: ${result.error}`);
       }
     } catch (err) {
-      console.error('💥 QR Payment error:', err);
+      console.error('QR Payment error:', err);
       setError(`Payment failed: ${err.message}`);
     } finally {
       setLoading(false);
@@ -400,21 +400,21 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
 
   const testBackendConnection = async () => {
     try {
-      console.log('🧪 Testing backend connection...');
+      console.log('Testing backend connection...');
       const response = await axios.get(`${API_BASE_URL}/`, {
         timeout: 5000
       });
-      console.log('✅ Backend connection successful:', response.data);
+      console.log('Backend connection successful:', response.data);
       setError("");
     } catch (err) {
-      console.error('❌ Backend connection failed:', err);
+      console.error('Backend connection failed:', err);
       setError(`Backend connection failed: ${err.message}`);
     }
   };
 
   const testSTKPushEndpoint = async () => {
     try {
-      console.log('🧪 Testing STK Push endpoint...');
+      console.log('Testing STK Push endpoint...');
       setLoading(true);
       
       const testPayload = {
@@ -445,14 +445,14 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
       }
       
       if (result.success) {
-        console.log('✅ STK Push test successful:', result);
-        setError(`✅ STK Push test successful! CheckoutRequestID: ${result.data.checkoutRequestID}`);
+        console.log('STK Push test successful:', result);
+        setError(`STK Push test successful! CheckoutRequestID: ${result.data.checkoutRequestID}`);
       } else {
-        console.log('❌ STK Push test failed:', result.error);
-        setError(`❌ STK Push test failed: ${result.error}`);
+        console.log('STK Push test failed:', result.error);
+        setError(`STK Push test failed: ${result.error}`);
       }
     } catch (err) {
-      console.error('💥 STK Push test error:', err);
+      console.error('STK Push test error:', err);
       setError(`STK Push test error: ${err.message}`);
     } finally {
       setLoading(false);
@@ -644,42 +644,6 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
             </Button>
           </div>
         )}
-
-        {/* Debug Section */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="border-gray-300">
-            <CardHeader>
-              <CardTitle className="text-sm">Debug Info</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="text-xs space-y-1">
-                <p><strong>Mode:</strong> {userRole === 'merchant' ? '🏢 Merchant' : '👤 Customer'}</p>
-                <p><strong>Token:</strong> {token ? '✅ Present' : (userRole === 'customer' ? '❌ Not Required (Customer)' : '❌ Missing')}</p>
-                <p><strong>Test Phone:</strong> {MPESA_CONFIG.TEST_PHONE}</p>
-                <p><strong>Payment Flow:</strong> {userRole === 'customer' ? 'Customer pays via STK Push' : 'Merchant can test payments'}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  onClick={testBackendConnection}
-                  variant="outline"
-                  size="sm"
-                  disabled={loading}
-                >
-                  Test Backend
-                </Button>
-                <Button 
-                  onClick={testSTKPushEndpoint}
-                  variant="outline"
-                  size="sm"
-                  disabled={loading}
-                >
-                  Test STK Push
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Error Display */}
         {error && (
           <Card className="border-red-500 bg-red-50">

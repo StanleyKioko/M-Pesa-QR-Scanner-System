@@ -94,7 +94,7 @@ async function healthCheck(req, res) {
 // Test endpoint to check M-Pesa API connectivity
 async function testMpesaConnection(req, res) {
   try {
-    console.log('🧪 Testing M-Pesa API connection...');
+    console.log('Testing M-Pesa API connection...');
     
     const accessToken = await generateAccessToken();
     
@@ -108,7 +108,7 @@ async function testMpesaConnection(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ M-Pesa connection test failed:', error);
+    console.error('M-Pesa connection test failed:', error);
     res.status(500).json({
       success: false,
       message: 'M-Pesa API connection failed',
@@ -123,7 +123,7 @@ async function testRegister(req, res) {
   try {
     const { email, password, name, phone, shortcode } = req.body;
     
-    console.log('🧪 Test registration request:', { email, name, phone, shortcode });
+    console.log('Test registration request:', { email, name, phone, shortcode });
     
     // Create Firebase user first
     const userRecord = await admin.auth().createUser({
@@ -132,7 +132,7 @@ async function testRegister(req, res) {
       displayName: name
     });
     
-    console.log('✅ Firebase user created:', userRecord.uid);
+    console.log('Firebase user created:', userRecord.uid);
     
     // Store merchant in Firestore
     await db.collection('merchants').doc(userRecord.uid).set({
@@ -145,7 +145,7 @@ async function testRegister(req, res) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     
-    console.log('✅ Merchant stored in Firestore');
+    console.log('Merchant stored in Firestore');
     
     res.status(201).json({
       success: true,
@@ -158,7 +158,7 @@ async function testRegister(req, res) {
     });
     
   } catch (error) {
-    console.error('❌ Test registration failed:', error);
+    console.error('Test registration failed:', error);
     res.status(500).json({
       success: false,
       message: 'Test registration failed',
@@ -169,7 +169,7 @@ async function testRegister(req, res) {
 
 // IMPROVED: Customer payment function with enhanced database storage
 async function triggerCustomerPayment(req, res) {
-  console.log('🚀 Customer payment initiated');
+  console.log('Customer payment initiated');
   const { phoneNumber, amount, qrData } = req.body;
   
   // Validate required fields
@@ -321,7 +321,7 @@ async function triggerCustomerPayment(req, res) {
 
       // Store transaction in database
       const transactionRef = await db.collection('transactions').add(transactionData);
-      console.log('✅ Transaction created in database:', transactionRef.id);
+      console.log('Transaction created in database:', transactionRef.id);
 
       // Return success response
       res.status(200).json({
@@ -361,7 +361,7 @@ async function triggerCustomerPayment(req, res) {
     }
 
   } catch (error) {
-    console.error('❌ Customer payment error:', error);
+    console.error('Customer payment error:', error);
     
     let errorMessage = 'Failed to initiate payment';
     if (error.response) {
@@ -383,7 +383,7 @@ async function triggerCustomerPayment(req, res) {
 async function handleCallback(req, res) {
   try {
     const callbackData = req.body;
-    console.log('📥 M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
+    console.log('M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
 
     if (callbackData.Body && callbackData.Body.stkCallback) {
       const stkCallback = callbackData.Body.stkCallback;
@@ -401,7 +401,7 @@ async function handleCallback(req, res) {
         status = 'failed';
       }
 
-      console.log(`🔄 Processing callback for CheckoutRequestID: ${checkoutRequestID}, ResultCode: ${resultCode}, Status: ${status}`);
+      console.log(`Processing callback for CheckoutRequestID: ${checkoutRequestID}, ResultCode: ${resultCode}, Status: ${status}`);
 
       // Extract callback metadata
       const callbackMetadata = {};
@@ -415,7 +415,7 @@ async function handleCallback(req, res) {
       const transactionDoc = await getTransactionByCheckoutRequestID(checkoutRequestID);
 
       if (transactionDoc) {
-        console.log(`✅ Found transaction ${transactionDoc.id} for update`);
+        console.log(`Found transaction ${transactionDoc.id} for update`);
         
         const updateData = {
           status,
@@ -442,16 +442,16 @@ async function handleCallback(req, res) {
 
         // Update the transaction in database
         await transactionDoc.ref.update(updateData);
-        console.log(`✅ Transaction ${transactionDoc.id} updated with status: ${status}`);
+        console.log(`Transaction ${transactionDoc.id} updated with status: ${status}`);
         
         // Log payment result
         if (status === 'success') {
-          console.log(`💰 Payment successful: KSH ${callbackMetadata.Amount} from ${callbackMetadata.PhoneNumber}`);
+          console.log(`Payment successful: KSH ${callbackMetadata.Amount} from ${callbackMetadata.PhoneNumber}`);
         } else {
-          console.log(`❌ Payment ${status}: ${resultDesc}`);
+          console.log(`Payment ${status}: ${resultDesc}`);
         }
       } else {
-        console.log(`⚠️ No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
+        console.log(`No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
         
         // Store orphaned callback for investigation
         await db.collection('orphaned_callbacks').add({
@@ -462,7 +462,7 @@ async function handleCallback(req, res) {
         });
       }
     } else {
-      console.log('❌ Invalid callback data format');
+      console.log('Invalid callback data format');
       return res.status(400).json({ error: 'Invalid callback data format' });
     }
 
@@ -471,7 +471,7 @@ async function handleCallback(req, res) {
       message: 'Callback processed successfully' 
     });
   } catch (err) {
-    console.error('💥 Callback processing error:', err);
+    console.error('Callback processing error:', err);
     res.status(500).json({ error: 'Failed to process callback' });
   }
 }
@@ -481,7 +481,7 @@ async function triggerSTKPush(req, res) {
   const { phoneNumber, amount, reference, description } = req.body;
   const merchantId = req.user.uid; // From auth middleware
   
-  console.log('🏢 Merchant STK Push request:', { 
+  console.log('Merchant STK Push request:', { 
     phoneNumber, 
     amount, 
     reference, 
@@ -610,7 +610,7 @@ async function triggerSTKPush(req, res) {
 
     const docRef = await db.collection('transactions').add(transactionData);
 
-    console.log(`✅ Transaction ${docRef.id} created successfully`);
+    console.log(`Transaction ${docRef.id} created successfully`);
 
     // Check for error in response
     if (response.data.errorCode || response.data.errorMessage) {
