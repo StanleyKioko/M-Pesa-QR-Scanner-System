@@ -292,18 +292,6 @@ const Login = ({ onLogin, onNavigateToRegister }) => {
                 </button>
               </p>
             </div>
-
-            {/* Debug Info (remove in production) */}
-            {process.env.NODE_ENV === 'development' && (
-              <details className="mt-4">
-                <summary className="text-xs text-gray-400 cursor-pointer">Debug Info</summary>
-                <div className="text-xs text-gray-400 mt-2 space-y-1">
-                  <p>API URL: {API_BASE_URL}</p>
-                  <p>Auth State: {auth.currentUser ? 'Authenticated' : 'Not authenticated'}</p>
-                  <p>Environment: {process.env.NODE_ENV}</p>
-                </div>
-              </details>
-            )}
           </CardContent>
         </Card>
       </div>

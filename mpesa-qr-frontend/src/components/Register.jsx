@@ -73,24 +73,24 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
     setError('');
     setSuccess('');
 
-    console.log('📝 Starting registration process...');
-    console.log('📧 Registration data:', {
+    console.log('Starting registration process...');
+    console.log('Registration data:', {
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
       shortcode: formData.shortcode
     });
-    console.log('🌐 API_BASE_URL:', API_BASE_URL);
+    console.log('API_BASE_URL:', API_BASE_URL);
 
     try {
       const { name, email, password, phone, shortcode } = formData;
 
-      console.log('🔥 Creating Firebase user...');
+      console.log('Creating Firebase user...');
       // Create user in Firebase Authentication first
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      console.log('✅ Firebase user created successfully:', {
+      console.log('Firebase user created successfully:', {
         uid: user.uid,
         email: user.email
       });
@@ -100,18 +100,18 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         await updateProfile(user, {
           displayName: name
         });
-        console.log('✅ Firebase profile updated with display name');
+        console.log('Firebase profile updated with display name');
       } catch (profileError) {
-        console.warn('⚠️ Failed to update Firebase profile:', profileError);
+        console.warn('Failed to update Firebase profile:', profileError);
         // Continue anyway, this is not critical
       }
 
-      console.log('🏢 Registering merchant in backend...');
-      console.log('📡 Making request to:', `${API_BASE_URL}/auth/signup`);
+      console.log('Registering merchant in backend...');
+      console.log('Making request to:', `${API_BASE_URL}/auth/signup`);
 
       // Get Firebase ID token for backend verification
       const idToken = await user.getIdToken();
-      console.log('🔑 Firebase ID token obtained');
+      console.log('Firebase ID token obtained');
 
       // Register merchant in backend - IMPORTANT: Include uid in the request
       const backendData = {
@@ -123,7 +123,7 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         shortcode
       };
 
-      console.log('📤 Sending data to backend:', backendData);
+      console.log('Sending data to backend:', backendData);
 
       const response = await axios.post(`${API_BASE_URL}/auth/signup`, backendData, {
         headers: {
@@ -133,7 +133,7 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         timeout: 15000 // 15 seconds timeout
       });
 
-      console.log('✅ Backend registration successful:', response.data);
+      console.log('Backend registration successful:', response.data);
 
       setSuccess('Registration successful! Redirecting to login...');
       
@@ -147,23 +147,23 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         shortcode: ''
       });
 
-      console.log('🎉 Registration complete, redirecting to login...');
+      console.log('Registration complete, redirecting to login...');
 
       // Call the callback to handle navigation after a short delay
       setTimeout(() => {
         if (onRegistrationSuccess) {
-          console.log('📞 Calling onRegistrationSuccess callback');
+          console.log('Calling onRegistrationSuccess callback');
           onRegistrationSuccess();
         } else if (onNavigateToLogin) {
-          console.log('📞 Calling onNavigateToLogin callback');
+          console.log('Calling onNavigateToLogin callback');
           onNavigateToLogin();
         } else {
-          console.warn('⚠️ No navigation callback provided');
+          console.warn('No navigation callback provided');
         }
       }, 2000);
 
     } catch (error) {
-      console.error('❌ Registration error:', {
+      console.error('Registration error:', {
         message: error.message,
         code: error.code,
         response: error.response?.data,
@@ -172,7 +172,7 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
 
       // Handle Firebase errors
       if (error.code) {
-        console.log('🔥 Firebase error detected:', error.code);
+        console.log('Firebase error detected:', error.code);
         switch (error.code) {
           case 'auth/email-already-in-use':
             setError('An account with this email already exists. Please try logging in instead.');
@@ -191,7 +191,7 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         }
       } else if (error.response) {
         // Handle backend errors
-        console.log('🏢 Backend error detected:', {
+        console.log('Backend error detected:', {
           status: error.response.status,
           data: error.response.data
         });
@@ -202,26 +202,26 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         // If backend registration failed, clean up Firebase user
         if (auth.currentUser) {
           try {
-            console.log('🧹 Cleaning up Firebase user due to backend error...');
+            console.log('Cleaning up Firebase user due to backend error...');
             await auth.currentUser.delete();
-            console.log('✅ Firebase user cleanup successful');
+            console.log('Firebase user cleanup successful');
           } catch (deleteError) {
-            console.error('❌ Failed to cleanup Firebase user:', deleteError);
+            console.error('Failed to cleanup Firebase user:', deleteError);
           }
         }
       } else {
         // Network or other errors
-        console.log('🌐 Network/other error:', error.message);
+        console.log('Network/other error:', error.message);
         setError('Network error. Please check your connection and try again.');
         
         // Clean up Firebase user if it was created
         if (auth.currentUser) {
           try {
-            console.log('🧹 Cleaning up Firebase user due to network error...');
+            console.log('Cleaning up Firebase user due to network error...');
             await auth.currentUser.delete();
-            console.log('✅ Firebase user cleanup successful');
+            console.log('Firebase user cleanup successful');
           } catch (deleteError) {
-            console.error('❌ Failed to cleanup Firebase user:', deleteError);
+            console.error('Failed to cleanup Firebase user:', deleteError);
           }
         }
       }
@@ -231,11 +231,11 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
   };
 
   const handleBackToLogin = () => {
-    console.log('🔙 Navigating back to login...');
+    console.log('Navigating back to login...');
     if (onNavigateToLogin) {
       onNavigateToLogin();
     } else {
-      console.warn('⚠️ onNavigateToLogin callback not provided');
+      console.warn('onNavigateToLogin callback not provided');
     }
   };
 
@@ -415,18 +415,6 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
                 </button>
               </p>
             </div>
-
-            {/* Debug Info (development only) */}
-            {process.env.NODE_ENV === 'development' && (
-              <details className="mt-4">
-                <summary className="text-xs text-gray-400 cursor-pointer">Debug Info</summary>
-                <div className="text-xs text-gray-400 mt-2 space-y-1">
-                  <p>API URL: {API_BASE_URL}</p>
-                  <p>Firebase Auth: {auth.currentUser ? `Logged in as ${auth.currentUser.email}` : 'Not authenticated'}</p>
-                  <p>Environment: {process.env.NODE_ENV}</p>
-                </div>
-              </details>
-            )}
           </CardContent>
         </Card>
       </div>
