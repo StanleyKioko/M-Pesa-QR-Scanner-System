@@ -15,7 +15,7 @@ import {
   Hash,
   MessageSquare
 } from 'lucide-react';
-import { STATUS, API_BASE_URL, APP_CONFIG } from '../utility/constants';
+import { STATUS, API_BASE_URL } from '../utility/constants';
 import axios from 'axios';
 
 const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
@@ -23,47 +23,89 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
   const [loading, setLoading] = useState(false);
   const [transactionDetails, setTransactionDetails] = useState(paymentData);
 
-  // Real status checking from backend
+  // Real status checking from backend with proper polling
   useEffect(() => {
-    if (status === STATUS.PENDING && paymentData?.transactionId) {
-      const checkStatus = async () => {
-        try {
-          const response = await axios.get(
-            `${API_BASE_URL}/transactions/${paymentData.transactionId}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          if (response.data.transaction) {
-            const transaction = response.data.transaction;
-            setStatus(transaction.status);
-            setTransactionDetails(prev => ({
-              ...prev,
-              ...transaction,
-              customerMessage: transaction.mpesaResponse?.CustomerMessage || prev.customerMessage
-            }));
-          }
-        } catch (error) {
-          console.error('Error checking transaction status:', error);
-        }
-      };
+    let pollInterval;
+    let timeoutId;
 
-      // Check status every 5 seconds for pending transactions
-      const interval = setInterval(checkStatus, APP_CONFIG.STATUS_CHECK_INTERVAL);
+    const pollTransactionStatus = async () => {
+      if (!transactionDetails?.transactionId || !token) {
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/transactions/${transactionDetails.transactionId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.data.transaction) {
+          const transaction = response.data.transaction;
+          const newStatus = transaction.status;
+          
+          console.log('Status update:', {
+            oldStatus: status,
+            newStatus,
+            transaction: transaction
+          });
+
+          setStatus(newStatus);
+          setTransactionDetails(prev => ({
+            ...prev,
+            ...transaction,
+            customerMessage: transaction.mpesaResponse?.CustomerMessage || 
+                           transaction.callbackData?.CustomerMessage ||
+                           prev.customerMessage
+          }));
+
+          // Stop polling if payment is complete (success, failed, or cancelled)
+          if (['success', 'failed', 'cancelled', 'error'].includes(newStatus)) {
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error polling transaction status:', error);
+        // Don't stop polling on error, continue trying
+      }
+    };
+
+    // Only poll for pending transactions
+    if (status === STATUS.PENDING && transactionDetails?.transactionId && token) {
+      // Initial check after 3 seconds
+      timeoutId = setTimeout(pollTransactionStatus, 3000);
       
-      // Initial check after 2 seconds
-      const timer = setTimeout(checkStatus, 2000);
+      // Then poll every 5 seconds
+      pollInterval = setInterval(pollTransactionStatus, 5000);
+
+      // Stop polling after 5 minutes (timeout)
+      const stopPollingTimeout = setTimeout(() => {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+        setStatus('failed');
+        setTransactionDetails(prev => ({
+          ...prev,
+          error: 'Payment timeout',
+          customerMessage: 'Payment timed out. Please try again.'
+        }));
+      }, 300000); // 5 minutes
 
       return () => {
-        clearInterval(interval);
-        clearTimeout(timer);
+        if (timeoutId) clearTimeout(timeoutId);
+        if (pollInterval) clearInterval(pollInterval);
+        if (stopPollingTimeout) clearTimeout(stopPollingTimeout);
       };
     }
-  }, [status, paymentData?.transactionId, token]);
+  }, [status, transactionDetails?.transactionId, token]);
 
   const getStatusDisplay = () => {
     switch (status) {
@@ -85,6 +127,15 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
           borderColor: 'border-red-500',
           textColor: 'text-red-700'
         };
+      case STATUS.CANCELLED:
+        return {
+          icon: <XCircle className="w-16 h-16 text-orange-500" />,
+          title: 'Payment Cancelled',
+          description: 'You cancelled the payment on your phone.',
+          bgColor: 'bg-orange-50',
+          borderColor: 'border-orange-500',
+          textColor: 'text-orange-700'
+        };
       case STATUS.PENDING:
       default:
         return {
@@ -102,13 +153,15 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
     const variants = {
       [STATUS.SUCCESS]: 'success',
       [STATUS.PENDING]: 'warning',
-      [STATUS.FAILED]: 'error'
+      [STATUS.FAILED]: 'error',
+      [STATUS.CANCELLED]: 'secondary'
     };
 
     const labels = {
       [STATUS.SUCCESS]: 'Completed',
       [STATUS.PENDING]: 'Pending',
-      [STATUS.FAILED]: 'Failed'
+      [STATUS.FAILED]: 'Failed',
+      [STATUS.CANCELLED]: 'Cancelled'
     };
 
     return (
@@ -128,7 +181,15 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
-    const date = new Date(timestamp);
+    
+    let date;
+    if (timestamp._seconds) {
+      // Firestore timestamp
+      date = new Date(timestamp._seconds * 1000);
+    } else {
+      date = new Date(timestamp);
+    }
+    
     return date.toLocaleString('en-KE', {
       year: 'numeric',
       month: 'short',
@@ -147,7 +208,7 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/transactions`,
+        `${API_BASE_URL}/transactions/${transactionDetails.transactionId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -156,23 +217,16 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
         }
       );
       
-      if (response.data.transactions) {
-        // Find our transaction in the list
-        const transaction = response.data.transactions.find(
-          t => t.id === transactionDetails.transactionId ||
-               t.transactionRef === transactionDetails.transactionRef
-        );
-        
-        if (transaction) {
-          setStatus(transaction.status);
-          setTransactionDetails(prev => ({
-            ...prev,
-            ...transaction,
-            customerMessage: transaction.mpesaResponse?.CustomerMessage || 
-                           transaction.callbackData?.CustomerMessage || 
-                           prev.customerMessage
-          }));
-        }
+      if (response.data.transaction) {
+        const transaction = response.data.transaction;
+        setStatus(transaction.status);
+        setTransactionDetails(prev => ({
+          ...prev,
+          ...transaction,
+          customerMessage: transaction.mpesaResponse?.CustomerMessage || 
+                         transaction.callbackData?.CustomerMessage || 
+                         prev.customerMessage
+        }));
       }
     } catch (error) {
       console.error('Error refreshing status:', error);
@@ -354,7 +408,7 @@ const PaymentConfirmation = ({ paymentData, onBack, onNewPayment, token }) => {
             </Button>
           )}
           
-          {status === STATUS.FAILED && (
+          {(status === STATUS.FAILED || status === STATUS.CANCELLED) && (
             <Button 
               onClick={onBack} 
               className="w-full" 

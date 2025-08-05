@@ -47,4 +47,63 @@ async function getTransactions(req, res) {
   }
 }
 
-module.exports = { createTransaction, getTransactions };
+// Get single transaction by ID
+async function getTransactionById(req, res) {
+  const { transactionId } = req.params;
+  const merchantId = req.user.uid;
+
+  try {
+    const transactionDoc = await db.collection("transactions").doc(transactionId).get();
+
+    if (!transactionDoc.exists) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    const transaction = transactionDoc.data();
+
+    // Verify the transaction belongs to the merchant
+    if (transaction.merchantId !== merchantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.status(200).json({ 
+      status: "success", 
+      transaction: {
+        id: transactionDoc.id,
+        ...transaction
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: `Failed to retrieve transaction: ${error.message}` });
+  }
+}
+
+// Get transaction by CheckoutRequestID (for callback updates)
+async function getTransactionByCheckoutRequestID(checkoutRequestID) {
+  try {
+    const snapshot = await db.collection('transactions')
+      .where('mpesaResponse.CheckoutRequestID', '==', checkoutRequestID)
+      .limit(1)
+      .get();
+
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      return {
+        id: doc.id,
+        ref: doc.ref,
+        data: doc.data()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error finding transaction by CheckoutRequestID:', error);
+    return null;
+  }
+}
+
+module.exports = { 
+  createTransaction, 
+  getTransactions, 
+  getTransactionById,
+  getTransactionByCheckoutRequestID 
+};
