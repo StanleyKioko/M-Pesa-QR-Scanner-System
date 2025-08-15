@@ -1,0 +1,155 @@
+{
+  "collections": {
+    "transactions": {
+      "description": "Store all M-Pesa payment transactions",
+      "fields": {
+        "id": {
+          "type": "string",
+          "description": "Auto-generated transaction ID",
+          "example": "abcd1234efgh5678"
+        },
+        "merchantId": {
+          "type": "string", 
+          "description": "Firebase UID of the merchant",
+          "required": true,
+          "indexed": true
+        },
+        "transactionRef": {
+          "type": "string",
+          "description": "Unique transaction reference",
+          "example": "Tx_1692123456789"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Customer phone number in 254XXXXXXXXX format", 
+          "required": true,
+          "example": "254708374149"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transaction amount in KES",
+          "required": true,
+          "example": 100.00
+        },
+        "status": {
+          "type": "string",
+          "description": "Transaction status",
+          "enum": ["pending", "success", "failed", "error", "cancelled"],
+          "required": true,
+          "indexed": true
+        },
+        "description": {
+          "type": "string",
+          "description": "Transaction description",
+          "example": "QR Payment"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When transaction was created",
+          "required": true,
+          "indexed": true
+        },
+        "updatedAt": {
+          "type": "timestamp", 
+          "description": "When transaction was last updated",
+          "required": true
+        },
+        "mpesaResponse": {
+          "type": "object",
+          "description": "M-Pesa STK push response",
+          "fields": {
+            "ResponseCode": "string",
+            "ResponseDescription": "string", 
+            "MerchantRequestID": "string",
+            "CheckoutRequestID": "string",
+            "CustomerMessage": "string"
+          }
+        },
+        "paymentDetails": {
+          "type": "object",
+          "description": "Payment details from successful transaction",
+          "fields": {
+            "amount": "number",
+            "mpesaReceiptNumber": "string",
+            "transactionDate": "string",
+            "phoneNumber": "string"
+          }
+        },
+        "callbackData": {
+          "type": "object",
+          "description": "Raw callback data from M-Pesa"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message for failed transactions"
+        }
+      }
+    },
+    "merchants": {
+      "description": "Store merchant profile information",
+      "fields": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase UID (document ID)",
+          "required": true
+        },
+        "name": {
+          "type": "string", 
+          "description": "Merchant business name",
+          "required": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Merchant email address", 
+          "required": true
+        },
+        "phone": {
+          "type": "string",
+          "description": "Merchant phone number",
+          "required": true
+        },
+        "shortcode": {
+          "type": "string",
+          "description": "M-Pesa business shortcode",
+          "required": true
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "required": true
+        },
+        "updatedAt": {
+          "type": "timestamp", 
+          "required": true
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive", "suspended"],
+          "default": "active"
+        }
+      }
+    }
+  },
+  "indexes": [
+    {
+      "collection": "transactions",
+      "fields": [
+        {"field": "merchantId", "order": "ascending"},
+        {"field": "createdAt", "order": "descending"}
+      ]
+    },
+    {
+      "collection": "transactions", 
+      "fields": [
+        {"field": "merchantId", "order": "ascending"},
+        {"field": "status", "order": "ascending"},
+        {"field": "createdAt", "order": "descending"}
+      ]
+    },
+    {
+      "collection": "transactions",
+      "fields": [
+        {"field": "mpesaResponse.CheckoutRequestID", "order": "ascending"}
+      ]
+    }
+  ]
+}

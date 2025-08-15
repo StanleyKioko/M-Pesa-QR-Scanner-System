@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Label from './ui/Label';
-import { ArrowLeft, Building } from 'lucide-react';
+import { ArrowLeft, Building, AlertCircle, CheckCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utility/constants';
 import axios from 'axios';
 
@@ -18,6 +18,7 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
     phone: '',
     shortcode: ''
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -27,45 +28,47 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
       ...formData,
       [e.target.name]: e.target.value
     });
-    // Clear errors when user starts typing
-    if (error) setError('');
+  };
+
+  const handleBackToLogin = () => {
+    if (onNavigateToLogin) {
+      onNavigateToLogin();
+    }
   };
 
   const validateForm = () => {
     const { name, email, password, confirmPassword, phone, shortcode } = formData;
 
     if (!name || !email || !password || !confirmPassword || !phone || !shortcode) {
-      setError('All fields are required');
-      return false;
+      return 'All fields are required';
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return false;
+      return 'Passwords do not match';
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return false;
+      return 'Password must be at least 6 characters';
     }
 
-    if (!/^254\d{9}$/.test(phone)) {
-      setError('Phone number must be in format 254XXXXXXXXX');
-      return false;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return 'Please enter a valid email address';
     }
 
-    if (!/^\d{5,6}$/.test(shortcode)) {
-      setError('Shortcode must be 5-6 digits');
-      return false;
+    if (!phone.startsWith('254') || phone.length < 12) {
+      return 'Phone number should start with 254 and be at least 12 digits';
     }
 
-    return true;
+    return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -73,49 +76,24 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
     setError('');
     setSuccess('');
 
-    console.log('Starting registration process...');
-    console.log('Registration data:', {
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      shortcode: formData.shortcode
-    });
-    console.log('API_BASE_URL:', API_BASE_URL);
+    const { name, email, password, phone, shortcode } = formData;
 
     try {
-      const { name, email, password, phone, shortcode } = formData;
-
-      console.log('Creating Firebase user...');
-      // Create user in Firebase Authentication first
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      console.log('Firebase user created successfully:', {
-        uid: user.uid,
-        email: user.email
-      });
-
-      // Update display name in Firebase
       try {
         await updateProfile(user, {
           displayName: name
         });
-        console.log('Firebase profile updated with display name');
       } catch (profileError) {
-        console.warn('Failed to update Firebase profile:', profileError);
-        // Continue anyway, this is not critical
+        // Profile update failed, but continue with registration
       }
 
-      console.log('Registering merchant in backend...');
-      console.log('Making request to:', `${API_BASE_URL}/auth/signup`);
-
-      // Get Firebase ID token for backend verification
       const idToken = await user.getIdToken();
-      console.log('Firebase ID token obtained');
 
-      // Register merchant in backend - IMPORTANT: Include uid in the request
       const backendData = {
-        uid: user.uid,  // This is crucial - backend needs to know the Firebase UID
+        uid: user.uid,
         email,
         password,
         name,
@@ -123,21 +101,16 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         shortcode
       };
 
-      console.log('Sending data to backend:', backendData);
-
-      const response = await axios.post(`${API_BASE_URL}/auth/signup`, backendData, {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/signup`, backendData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`
         },
-        timeout: 15000 // 15 seconds timeout
+        timeout: 15000
       });
 
-      console.log('Backend registration successful:', response.data);
-
       setSuccess('Registration successful! Redirecting to login...');
-      
-      // Clear form
+
       setFormData({
         name: '',
         email: '',
@@ -147,35 +120,19 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
         shortcode: ''
       });
 
-      console.log('Registration complete, redirecting to login...');
-
-      // Call the callback to handle navigation after a short delay
       setTimeout(() => {
         if (onRegistrationSuccess) {
-          console.log('Calling onRegistrationSuccess callback');
           onRegistrationSuccess();
         } else if (onNavigateToLogin) {
-          console.log('Calling onNavigateToLogin callback');
           onNavigateToLogin();
-        } else {
-          console.warn('No navigation callback provided');
         }
       }, 2000);
 
     } catch (error) {
-      console.error('Registration error:', {
-        message: error.message,
-        code: error.code,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-
-      // Handle Firebase errors
       if (error.code) {
-        console.log('Firebase error detected:', error.code);
         switch (error.code) {
           case 'auth/email-already-in-use':
-            setError('An account with this email already exists. Please try logging in instead.');
+            setError('An account with this email already exists.');
             break;
           case 'auth/invalid-email':
             setError('Invalid email address format.');
@@ -190,57 +147,30 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
             setError(`Firebase error: ${error.message}`);
         }
       } else if (error.response) {
-        // Handle backend errors
-        console.log('Backend error detected:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-        
         const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Backend registration failed';
         setError(`Registration failed: ${errorMessage}`);
 
-        // If backend registration failed, clean up Firebase user
         if (auth.currentUser) {
           try {
-            console.log('Cleaning up Firebase user due to backend error...');
             await auth.currentUser.delete();
-            console.log('Firebase user cleanup successful');
           } catch (deleteError) {
-            console.error('Failed to cleanup Firebase user:', deleteError);
+            // Failed to cleanup Firebase user
           }
         }
       } else {
-        // Network or other errors
-        console.log('Network/other error:', error.message);
         setError('Network error. Please check your connection and try again.');
         
-        // Clean up Firebase user if it was created
         if (auth.currentUser) {
           try {
-            console.log('Cleaning up Firebase user due to network error...');
             await auth.currentUser.delete();
-            console.log('Firebase user cleanup successful');
           } catch (deleteError) {
-            console.error('Failed to cleanup Firebase user:', deleteError);
+            // Failed to cleanup Firebase user
           }
         }
       }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleBackToLogin = () => {
-    console.log('Navigating back to login...');
-    if (onNavigateToLogin) {
-      onNavigateToLogin();
-    } else {
-      console.warn('onNavigateToLogin callback not provided');
-    }
-  };
-
-  const clearError = () => {
-    setError('');
   };
 
   return (
@@ -269,59 +199,78 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                <span className="text-sm text-red-700">{error}</span>
+              </div>
+            )}
+
+            {success && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md flex items-start">
+                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
+                <span className="text-sm text-green-700">{success}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                  <div className="flex justify-between items-start">
-                    <p className="text-red-600 text-sm flex-1">{error}</p>
-                    <button 
-                      onClick={clearError}
-                      className="text-red-400 hover:text-red-600 ml-2"
-                      type="button"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {success && (
-                <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                  <p className="text-green-600 text-sm">{success}</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="name">Business Name</Label>
                 <Input
                   id="name"
                   name="name"
                   type="text"
-                  placeholder="Your Business Name"
+                  placeholder="Enter your business name"
                   value={formData.name}
                   onChange={handleChange}
                   disabled={loading}
                   required
-                  autoComplete="organization"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+              <div>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="business@example.com"
+                  placeholder="Enter your email"
                   value={formData.email}
                   onChange={handleChange}
                   disabled={loading}
                   required
-                  autoComplete="email"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Create a password (min. 6 characters)"
+                  value={formData.password}
+                  onChange={handleChange}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input
                   id="phone"
@@ -332,89 +281,43 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
                   onChange={handleChange}
                   disabled={loading}
                   required
-                  autoComplete="tel"
                 />
-                <p className="text-xs text-gray-500">Format: 254XXXXXXXXX</p>
               </div>
 
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="shortcode">Business Shortcode</Label>
                 <Input
                   id="shortcode"
                   name="shortcode"
                   type="text"
-                  placeholder="174379"
+                  placeholder="Enter your M-Pesa shortcode"
                   value={formData.shortcode}
                   onChange={handleChange}
                   disabled={loading}
                   required
-                  autoComplete="off"
-                />
-                <p className="text-xs text-gray-500">5-6 digit business shortcode</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                  disabled={loading}
-                  required
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  disabled={loading}
-                  required
-                  autoComplete="new-password"
                 />
               </div>
 
               <Button 
                 type="submit" 
-                className="w-full"
+                className="w-full" 
                 disabled={loading}
               >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Creating Account...
-                  </span>
-                ) : (
-                  'Register Merchant'
-                )}
+                {loading ? 'Creating Account...' : 'Create Merchant Account'}
               </Button>
-            </form>
 
-            <div className="text-center mt-4">
-              <p className="text-sm text-gray-600">
-                Already have an account?{' '}
-                <button
-                  onClick={handleBackToLogin}
-                  className="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
-                  disabled={loading}
+              <div className="text-center">
+                <Button
                   type="button"
+                  variant="link"
+                  onClick={handleBackToLogin}
+                  disabled={loading}
+                  className="text-sm text-blue-600 hover:text-blue-800"
                 >
-                  Login here
-                </button>
-              </p>
-            </div>
+                  Already have an account? Login here
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>

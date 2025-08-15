@@ -1,15 +1,13 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
-
-// Import existing components
-import QRScanner from './components/QRScanner';
-import Transactions from './components/Transactions';
 import Login from './components/Login';
 import Register from './components/Register';
-import MerchantDashboard from './components/MerchantDashboard';
+import QRScanner from './components/QRScanner';
 import PaymentConfirmation from './components/PaymentConfirmation';
+import MerchantDashboard from './components/MerchantDashboard';
+import { API_BASE_URL } from './utility/constants';
+import axios from 'axios';
 
 function App() {
   const [userRole, setUserRole] = useState(null); // 'customer' | 'merchant' | null
@@ -18,6 +16,7 @@ function App() {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
 
   useEffect(() => {
     console.log('🔄 Setting up Firebase auth listener...');
@@ -26,45 +25,76 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔥 Firebase auth state changed:', firebaseUser ? firebaseUser.uid : 'No user');
       
-      if (firebaseUser) {
+      if (firebaseUser && !autoLoginAttempted) {
+        setAutoLoginAttempted(true);
+        
         try {
-          console.log('✅ Firebase user found, getting token...');
+          console.log('✅ Firebase user found, attempting auto-login...');
           const idToken = await firebaseUser.getIdToken();
           
+          // Verify merchant exists in backend before auto-login
+          console.log('🏢 Verifying merchant in backend for auto-login...');
+          // FIXED: Changed from /auth/login to /api/auth/login
+          const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            timeout: 10000
+          });
+
+          console.log('✅ Backend verification successful for auto-login:', response.data);
+
           setToken(idToken);
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            displayName: firebaseUser.displayName
+            displayName: firebaseUser.displayName || response.data.user?.name,
+            ...response.data.user
           });
-          setUserRole('merchant'); // Firebase users are merchants
+          setUserRole('merchant');
           setAppState('dashboard');
           
           console.log('✅ Auto-login successful, redirecting to dashboard');
           console.log('User data:', {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            displayName: firebaseUser.displayName
+            displayName: firebaseUser.displayName || response.data.user?.name
           });
         } catch (error) {
-          console.error('❌ Error getting token:', error);
-          setToken(null);
-          setUser(null);
-          setUserRole(null);
-          setAppState('login');
+          console.error('❌ Auto-login failed:', error);
+          
+          // If backend verification fails, sign out from Firebase
+          try {
+            await signOut(auth);
+            console.log('🚪 Signed out due to backend verification failure');
+          } catch (signOutError) {
+            console.error('⚠️ Error signing out:', signOutError);
+          }
+          
+          resetAppState();
         }
-      } else {
+      } else if (!firebaseUser) {
         console.log('👋 No Firebase user, going to login');
-        setToken(null);
-        setUser(null);
-        setUserRole(null);
-        setAppState('login');
+        resetAppState();
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [autoLoginAttempted]);
+
+  const resetAppState = () => {
+    setToken(null);
+    setUser(null);
+    setUserRole(null);
+    setAppState('login');
+    setAutoLoginAttempted(false);
+    setCurrentPayment(null);
+  };
 
   const handleLogin = (role, authData = null) => {
     console.log('🔐 handleLogin called:', { role, hasAuthData: !!authData });
@@ -74,14 +104,14 @@ function App() {
       console.log('👤 Customer login, going to scanner');
       setAppState('scanner');
     } else if (role === 'merchant') {
-      if (authData) {
+      if (authData && authData.token && authData.user) {
         console.log('🏢 Merchant login successful, setting data:', authData.user);
         setToken(authData.token);
         setUser(authData.user);
         setAppState('dashboard');
         console.log('✅ App state set to dashboard');
       } else {
-        console.error('❌ Merchant login without auth data');
+        console.error('❌ Merchant login without proper auth data:', authData);
         setAppState('login');
       }
     }
@@ -89,122 +119,109 @@ function App() {
 
   const handleLogout = async () => {
     console.log('🚪 Logout initiated...');
+    
+    // Show loading state
+    setLoading(true);
+    
     try {
-      if (userRole === 'merchant') {
+      if (userRole === 'merchant' && auth.currentUser) {
         console.log('🔥 Signing out from Firebase...');
         await signOut(auth);
+        console.log('✅ Firebase signout successful');
       }
-      setUserRole(null);
-      setAppState('login');
-      setCurrentPayment(null);
-      setToken(null);
-      setUser(null);
-      console.log('✅ Logout successful');
+      
+      // Clear all state
+      resetAppState();
+      console.log('✅ Logout complete, redirecting to login');
+      
     } catch (error) {
       console.error('❌ Logout error:', error);
+      // Even if logout fails, reset the app state
+      resetAppState();
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleNavigateToRegister = () => {
+    console.log('📝 Navigate to register');
+    setAppState('register');
+  };
+
+  const handleNavigateToLogin = () => {
+    console.log('🔐 Navigate to login');
+    setAppState('login');
+  };
+
   const handlePaymentInitiated = (paymentData) => {
+    console.log('💳 Payment initiated:', paymentData);
     setCurrentPayment(paymentData);
     setAppState('payment');
   };
 
   const handleBackToScanner = () => {
-    setAppState('scanner');
-  };
-
-  const handleNewPayment = () => {
+    console.log('📷 Back to scanner');
     setCurrentPayment(null);
     setAppState('scanner');
   };
 
-  const handleNavigateToRegister = () => {
-    setAppState('register');
+  const handleBackToDashboard = () => {
+    console.log('📊 Back to dashboard');
+    setCurrentPayment(null);
+    setAppState('dashboard');
   };
 
-  const handleNavigateToLogin = () => {
-    setAppState('login');
-  };
-
-  const handleRegistrationSuccess = () => {
-    setAppState('login');
-  };
-
-  // Debug current state
-  console.log('📱 App render state:', {
-    appState,
-    userRole,
-    hasToken: !!token,
-    hasUser: !!user,
-    loading
-  });
-
+  // Show loading screen while checking auth state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {appState === 'login' ? 'Loading...' : 'Signing out...'}
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Enhanced Landing Page Flow
+  // Render based on app state
   switch (appState) {
-    case 'login':
-      console.log('🔑 Rendering Login component');
-      return (
-        <Login 
-          onLogin={handleLogin} 
-          onNavigateToRegister={handleNavigateToRegister}
-        />
-      );
-    
     case 'register':
-      console.log('📝 Rendering Register component');
       return (
         <Register 
           onNavigateToLogin={handleNavigateToLogin}
-          onRegistrationSuccess={handleRegistrationSuccess}
+          onRegistrationSuccess={handleNavigateToLogin}
         />
       );
     
     case 'scanner':
-      console.log('📱 Rendering QRScanner component');
       return (
-        <QRScanner
-          onBack={handleLogout}
+        <QRScanner 
           onPaymentInitiated={handlePaymentInitiated}
-          token={token}
+          onLogout={handleLogout}
         />
       );
     
     case 'payment':
-      console.log('💳 Rendering PaymentConfirmation component');
       return (
         <PaymentConfirmation 
           paymentData={currentPayment}
-          onBack={handleBackToScanner}
-          onNewPayment={handleNewPayment}
-          token={token}
+          onBack={userRole === 'customer' ? handleBackToScanner : handleBackToDashboard}
+          userRole={userRole}
         />
       );
     
     case 'dashboard':
-      console.log('📊 Rendering Dashboard with Router');
       return (
-        <Router>
-          <Routes>
-            <Route path="/" element={<MerchantDashboard onBack={handleLogout} user={user} token={token} />} />
-            <Route path="/scanner" element={<QRScanner token={token} user={user} />} />
-            <Route path="/transactions" element={<Transactions token={token} user={user} />} />
-            <Route path="/login" element={<Login setToken={setToken} setUser={setUser} />} />
-            <Route path="/register" element={<Register />} />
-          </Routes>
-        </Router>
+        <MerchantDashboard 
+          user={user}
+          token={token}
+          onLogout={handleLogout}
+        />
       );
     
     default:
-      console.log('❓ Default case, rendering Login');
       return (
         <Login 
           onLogin={handleLogin} 
