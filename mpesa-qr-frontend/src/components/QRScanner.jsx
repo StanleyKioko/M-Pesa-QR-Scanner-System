@@ -3,13 +3,21 @@ import Button from "./ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/Card";
 import Input from "./ui/Input";
 import Label from "./ui/Label";
-import { Camera, QrCode, ArrowLeft, Phone, DollarSign, User } from "lucide-react";
+import { Camera, QrCode, ArrowLeft, Phone, DollarSign, User, Home, BarChart3, LogOut, ChevronDown } from "lucide-react";
 import QRScannerCamera from './QRScannerCamera';
 import { parseQRCode, generateSampleQRData, validatePhoneNumber, validateAmount } from '../utility/qrParser';
 import { API_BASE_URL, STATUS, MPESA_CONFIG, ERROR_MESSAGES } from '../utility/constants';
 import axios from 'axios';
 
-const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken }) => {
+const QRScanner = ({ 
+  onPaymentInitiated, 
+  onLogout, 
+  onNavigateToLanding, 
+  onNavigateToDashboard, 
+  token, 
+  userRole, 
+  getValidToken 
+}) => {
   const [isScanning, setIsScanning] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(MPESA_CONFIG.TEST_PHONE);
@@ -18,6 +26,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
   const [qrData, setQrData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showNavMenu, setShowNavMenu] = useState(false);
 
   const handleQRScanSuccess = (qrText, qrResult) => {
     console.log('QR Scanned successfully:', qrText);
@@ -177,15 +186,15 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
             transactionId: response.data.data?.transactionId,
             checkoutRequestID: response.data.data?.CheckoutRequestID,
             merchantRequestID: response.data.data?.MerchantRequestID,
-            responseDescription: response.data.data?.ResponseDescription,
+            customerMessage: response.data.data?.CustomerMessage,
             mpesaResponse: response.data.data
           }
         };
       } else {
-        console.log('Customer payment failed with response:', response.data);
+        console.log('Customer payment failed:', response.data);
         return {
           success: false,
-          error: response.data.message || 'Payment initiation failed'
+          error: response.data.error || response.data.message || 'Payment failed'
         };
       }
     } catch (err) {
@@ -197,11 +206,10 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
       });
       
       let errorMessage = 'Network error';
-      
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.response?.data?.error) {
+      if (err.response?.data?.error) {
         errorMessage = err.response.data.error;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
       } else if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timeout. Please check your connection and try again.';
       } else if (err.code === 'NETWORK_ERROR') {
@@ -391,7 +399,7 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
         setError(`Payment failed: ${result.error}`);
       }
     } catch (err) {
-      console.error('QR Payment error:', err);
+      console.error('QR payment error:', err);
       setError(`Payment failed: ${err.message}`);
     } finally {
       setLoading(false);
@@ -401,26 +409,25 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
   const testBackendConnection = async () => {
     try {
       console.log('Testing backend connection...');
-      const response = await axios.get(`${API_BASE_URL}/`, {
-        timeout: 5000
-      });
+      const response = await axios.get(`${API_BASE_URL}/health`);
+      
       console.log('Backend connection successful:', response.data);
-      setError("");
+      setError(`Backend connection successful! Server is running.`);
     } catch (err) {
       console.error('Backend connection failed:', err);
       setError(`Backend connection failed: ${err.message}`);
     }
   };
 
-  const testSTKPushEndpoint = async () => {
+  const testSTKPush = async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      console.log('Testing STK Push endpoint...');
-      setLoading(true);
-      
       const testPayload = {
         phoneNumber: MPESA_CONFIG.TEST_PHONE,
         amount: 1,
-        reference: `TEST_${userRole || 'CUSTOMER'}_${Date.now()}`,
+        reference: `TEST_${Date.now()}`,
         description: `Test ${userRole === 'merchant' ? 'Merchant' : 'Customer'} STK Push from Frontend`,
         merchantDetails: {
           name: 'Test Merchant'
@@ -461,25 +468,89 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Enhanced Header with Navigation */}
       <div className="bg-blue-600 text-white p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onBack}
-              className="text-white hover:bg-blue-700"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="font-semibold">QR Scanner</h1>
+            <h1 className="font-semibold">
+              {userRole === 'customer' ? 'Customer Payment' : 'QR Scanner'}
+            </h1>
           </div>
-          <QrCode className="w-6 h-6" />
+          
+          {/* Navigation Menu */}
+          <div className="flex items-center gap-2">
+            <QrCode className="w-6 h-6" />
+            
+            {/* Navigation Dropdown */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowNavMenu(!showNavMenu)}
+                className="text-white hover:bg-blue-700"
+              >
+                <ChevronDown className="w-5 h-5" />
+              </Button>
+              
+              {showNavMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
+                  {/* Landing Page Option */}
+                  <button
+                    onClick={() => {
+                      setShowNavMenu(false);
+                      onNavigateToLanding();
+                    }}
+                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <Home className="w-4 h-4" />
+                    Back to Landing
+                  </button>
+                  
+                  {/* Dashboard Option for Merchants */}
+                  {userRole === 'merchant' && onNavigateToDashboard && (
+                    <button
+                      onClick={() => {
+                        setShowNavMenu(false);
+                        onNavigateToDashboard();
+                      }}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      Dashboard
+                    </button>
+                  )}
+                  
+                  {/* Logout Option */}
+                  <button
+                    onClick={() => {
+                      setShowNavMenu(false);
+                      onLogout();
+                    }}
+                    className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="container mx-auto p-4 space-y-4">
+        {/* User Role Indicator */}
+        <Card className={`border-2 ${userRole === 'customer' ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50'}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <User className={`w-5 h-5 ${userRole === 'customer' ? 'text-green-600' : 'text-blue-600'}`} />
+              <span className={`font-medium ${userRole === 'customer' ? 'text-green-800' : 'text-blue-800'}`}>
+                {userRole === 'customer' ? 'Customer Mode' : 'Merchant Mode'}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Scanner Mode */}
         {isScanning ? (
           <Card>
@@ -644,6 +715,34 @@ const QRScanner = ({ onBack, onPaymentInitiated, token, userRole, getValidToken 
             </Button>
           </div>
         )}
+
+        {/* Development Tools */}
+        <Card className="border-gray-300">
+          <CardHeader>
+            <CardTitle className="text-sm">Development Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={testBackendConnection}
+                disabled={loading}
+              >
+                Test Backend
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={testSTKPush}
+                disabled={loading}
+              >
+                Test STK Push
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Error Display */}
         {error && (
           <Card className="border-red-500 bg-red-50">

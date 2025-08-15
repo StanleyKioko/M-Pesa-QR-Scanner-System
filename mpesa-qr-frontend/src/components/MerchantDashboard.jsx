@@ -18,12 +18,22 @@ import {
   BarChart3,
   AlertCircle,
   LogOut,
-  User
+  User,
+  QrCode,
+  Home,
+  ChevronDown
 } from 'lucide-react';
 import { API_BASE_URL, STATUS } from '../utility/constants';
 import axios from 'axios';
 
-const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
+const MerchantDashboard = ({ 
+  onBack, 
+  onLogout, 
+  onNavigateToLanding, 
+  onNavigateToScanner, 
+  user, 
+  token 
+}) => {
   const [transactions, setTransactions] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [stats, setStats] = useState({
@@ -37,6 +47,7 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showNavMenu, setShowNavMenu] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [customDateRange, setCustomDateRange] = useState({
@@ -144,62 +155,47 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
     };
 
     return (
-      <Badge variant={variants[status] || 'default'}>
+      <Badge variant={variants[status] || 'secondary'}>
         {labels[status] || status}
       </Badge>
     );
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2
-    }).format(amount || 0);
+    return `KSH ${parseFloat(amount || 0).toFixed(2)}`;
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleString('en-KE');
-    } catch (error) {
-      return 'Invalid Date';
-    }
+    return new Date(dateString).toLocaleDateString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const exportData = () => {
-    if (!analytics || !analytics.transactions) return;
-
-    const csvHeaders = ['Date', 'Phone', 'Amount', 'Status', 'Reference'];
-    const csvRows = analytics.transactions.map(transaction => [
-      formatDate(transaction.createdAt),
-      transaction.phoneNumber,
-      transaction.amount,
-      transaction.status,
-      transaction.transactionRef || 'N/A'
-    ]);
-
-    const csvContent = [csvHeaders, ...csvRows]
-      .map(row => row.map(field => `"${field}"`).join(','))
-      .join('\n');
-
+    if (!analytics?.transactions) return;
+    
+    const csvContent = [
+      ['Phone', 'Amount', 'Status', 'Date', 'Reference'],
+      ...analytics.transactions.map(t => [
+        t.phoneNumber,
+        t.amount,
+        t.status,
+        formatDate(t.createdAt),
+        t.transactionRef || 'N/A'
+      ])
+    ].map(row => row.join(',')).join('\n');
+    
     const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `merchant-transactions-${dateFilter}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `transactions_${dateFilter}_${Date.now()}.csv`;
     a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const getPeriodLabel = () => {
-    switch (dateFilter) {
-      case 'today': return 'Today';
-      case 'week': return 'This Week';
-      case 'month': return 'This Month';
-      case 'custom': return 'Custom Range';
-      default: return 'All Time';
-    }
+    URL.revokeObjectURL(url);
   };
 
   const handleLogout = () => {
@@ -211,7 +207,7 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Logout */}
+      {/* Enhanced Header with Navigation */}
       <div className="bg-blue-600 text-white p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -232,6 +228,7 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
               </p>
             </div>
           </div>
+          
           <div className="flex items-center gap-2">
             {/* User Info */}
             <div className="hidden md:flex items-center gap-2 text-sm">
@@ -260,16 +257,61 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             
-            {/* Logout Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="text-white hover:bg-red-600 border border-white/20"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5" />
-            </Button>
+            {/* Navigation Dropdown */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowNavMenu(!showNavMenu)}
+                className="text-white hover:bg-blue-700"
+              >
+                <ChevronDown className="w-5 h-5" />
+              </Button>
+              
+              {showNavMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
+                  {/* Scanner Option */}
+                  {onNavigateToScanner && (
+                    <button
+                      onClick={() => {
+                        setShowNavMenu(false);
+                        onNavigateToScanner();
+                      }}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      QR Scanner
+                    </button>
+                  )}
+                  
+                  {/* Landing Page Option */}
+                  {onNavigateToLanding && (
+                    <button
+                      onClick={() => {
+                        setShowNavMenu(false);
+                        onNavigateToLanding();
+                      }}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Home className="w-4 h-4" />
+                      Back to Landing
+                    </button>
+                  )}
+                  
+                  {/* Logout Option */}
+                  <button
+                    onClick={() => {
+                      setShowNavMenu(false);
+                      handleLogout();
+                    }}
+                    className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -285,6 +327,35 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
             </CardContent>
           </Card>
         )}
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {onNavigateToScanner && (
+            <Button
+              onClick={onNavigateToScanner}
+              className="flex items-center gap-2 p-6 h-auto"
+            >
+              <QrCode className="w-6 h-6" />
+              <div className="text-left">
+                <div className="font-semibold">Process Payment</div>
+                <div className="text-sm opacity-90">Scan QR or enter manually</div>
+              </div>
+            </Button>
+          )}
+          
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center gap-2 p-6 h-auto"
+          >
+            <RefreshCw className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
+            <div className="text-left">
+              <div className="font-semibold">Refresh Data</div>
+              <div className="text-sm opacity-70">Update analytics</div>
+            </div>
+          </Button>
+        </div>
 
         {/* Filters */}
         {showFilters && (
@@ -383,21 +454,8 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
           </Card>
         )}
 
-        {/* Period Indicator */}
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-gray-800">
-            Analytics for {getPeriodLabel()}
-          </h2>
-          {analytics?.dateRange && (
-            <p className="text-sm text-gray-600">
-              {new Date(analytics.dateRange.start).toLocaleDateString('en-KE')} - {' '}
-              {new Date(analytics.dateRange.end).toLocaleDateString('en-KE')}
-            </p>
-          )}
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -494,14 +552,11 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
           </Card>
         </div>
 
-        {/* Daily Summary Report */}
+        {/* Daily Summary */}
         {analytics?.dailySummary && analytics.dailySummary.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Daily Summary
-              </CardTitle>
+              <CardTitle>Daily Summary</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -601,4 +656,4 @@ const MerchantDashboard = ({ onBack, onLogout, user, token }) => {
   );
 };
 
-export default MerchantDashboard;
+export default MerchantDashboard

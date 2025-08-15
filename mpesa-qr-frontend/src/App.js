@@ -57,7 +57,6 @@ function App() {
           });
           setUserRole('merchant');
           setAppState('dashboard');
-          
           console.log('✅ Auto-login successful, redirecting to dashboard');
           console.log('User data:', {
             uid: firebaseUser.uid,
@@ -153,6 +152,28 @@ function App() {
     setAppState('login');
   };
 
+  // NEW: Navigate back to landing page without logout
+  const handleNavigateToLanding = () => {
+    console.log('🏠 Navigate back to landing page');
+    // Don't reset user data, just change app state
+    setAppState('login');
+    setCurrentPayment(null);
+  };
+
+  // NEW: Navigate to scanner from merchant dashboard  
+  const handleNavigateToScanner = () => {
+    console.log('📷 Navigate to scanner from dashboard');
+    setAppState('scanner');
+  };
+
+  // NEW: Navigate to dashboard from scanner
+  const handleNavigateToDashboard = () => {
+    console.log('📊 Navigate to dashboard from scanner');
+    if (userRole === 'merchant') {
+      setAppState('dashboard');
+    }
+  };
+
   const handlePaymentInitiated = (paymentData) => {
     console.log('💳 Payment initiated:', paymentData);
     setCurrentPayment(paymentData);
@@ -200,6 +221,10 @@ function App() {
         <QRScanner 
           onPaymentInitiated={handlePaymentInitiated}
           onLogout={handleLogout}
+          onNavigateToLanding={handleNavigateToLanding}
+          onNavigateToDashboard={userRole === 'merchant' ? handleNavigateToDashboard : null}
+          token={token}
+          userRole={userRole}
         />
       );
     
@@ -218,6 +243,8 @@ function App() {
           user={user}
           token={token}
           onLogout={handleLogout}
+          onNavigateToLanding={handleNavigateToLanding}
+          onNavigateToScanner={handleNavigateToScanner}
         />
       );
     
@@ -226,6 +253,8 @@ function App() {
         <Login 
           onLogin={handleLogin} 
           onNavigateToRegister={handleNavigateToRegister}
+          user={user}
+          userRole={userRole}
         />
       );
   }
