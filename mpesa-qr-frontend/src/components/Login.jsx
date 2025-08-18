@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Label from './ui/Label';
-import { User, Building, AlertCircle, CheckCircle } from 'lucide-react';
+import { User, Building, AlertCircle, CheckCircle, QrCode, Camera } from 'lucide-react';
 import { API_BASE_URL } from '../utility/constants';
 import axios from 'axios';
 
-const Login = ({ onLogin, onNavigateToRegister }) => {
+const Login = ({ onLogin, onNavigateToRegister, onNavigateToScanner }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -107,11 +107,11 @@ const Login = ({ onLogin, onNavigateToRegister }) => {
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Building className="w-8 h-8 text-blue-600" />
+              <QrCode className="w-8 h-8 text-blue-600" />
             </div>
             <CardTitle>M-Pesa QR Scanner</CardTitle>
             <CardDescription>
-              Choose your role to continue
+              Scan QR codes to make instant payments
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -129,36 +129,61 @@ const Login = ({ onLogin, onNavigateToRegister }) => {
               </div>
             )}
 
-            <div className="mb-4">
-              <Button
-                onClick={() => handleLogin('customer')}
-                disabled={loading}
-                className="w-full flex items-center justify-center py-3"
-                variant="outline"
-              >
-                <User className="w-5 h-5 mr-2" />
-                Continue as Customer
-              </Button>
+            {/* Customer Section - Primary Focus */}
+            <div className="mb-6">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Camera className="w-6 h-6 text-green-600" />
+                  <div>
+                    <h3 className="font-semibold text-green-800">Ready to Pay?</h3>
+                    <p className="text-sm text-green-700">
+                      Scan merchant QR codes and pay instantly with M-Pesa
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleLogin('customer')}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center py-3 bg-green-600 hover:bg-green-700"
+                  >
+                    <Camera className="w-5 h-5 mr-2" />
+                    Start Scanning & Paying
+                  </Button>
+                  
+                  <p className="text-xs text-green-600 text-center">
+                    No registration required • Scan • Pay • Done
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="relative mb-4">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+                <span className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-muted-foreground">
-                  Or login as merchant
+                <span className="bg-gray-100 px-3 text-gray-500 font-medium">
+                  For Business Owners
                 </span>
               </div>
             </div>
 
+            {/* Merchant Section - Secondary */}
             <div className="space-y-4">
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-3">
+                  Generate QR codes and manage payments
+                </p>
+              </div>
+              
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Business Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="Enter your business email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
@@ -181,21 +206,22 @@ const Login = ({ onLogin, onNavigateToRegister }) => {
                 onClick={() => handleLogin('merchant')}
                 disabled={loading || !email || !password}
                 className="w-full flex items-center justify-center py-3"
+                variant="outline"
               >
                 <Building className="w-5 h-5 mr-2" />
                 {loading ? 'Signing In...' : 'Login as Merchant'}
               </Button>
-            </div>
 
-            <div className="mt-6 text-center">
-              <Button
-                variant="link"
-                onClick={onNavigateToRegister}
-                disabled={loading}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Don't have a merchant account? Register here
-              </Button>
+              <div className="text-center">
+                <Button
+                  variant="link"
+                  onClick={onNavigateToRegister}
+                  disabled={loading}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Don't have a merchant account? Register here
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -6,7 +6,8 @@ const {
   triggerCustomerPayment,
   healthCheck,
   testMpesaConnection,
-  testRegister
+  testRegister,
+  generateMerchantQR
 } = require('../controllers/daraja');
 const { verifyToken } = require('../middlewares/auth');
 
@@ -23,6 +24,8 @@ router.post('/customer-payment', triggerCustomerPayment);
 
 // POST /api/trigger-stk-push (requires authentication)
 router.post('/trigger-stk-push', verifyToken, triggerSTKPush);
+
+router.post("/generate-qr", verifyToken, generateMerchantQR);
 
 // POST /daraja/stk-callback (public endpoint for M-Pesa callbacks)
 router.post('/stk-callback', (req, res, next) => {
