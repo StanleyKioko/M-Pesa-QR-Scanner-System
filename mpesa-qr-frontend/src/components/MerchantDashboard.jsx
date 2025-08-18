@@ -21,7 +21,9 @@ import {
   User,
   QrCode,
   Home,
-  ChevronDown
+  ChevronDown,
+  Bug, // NEW: Debug icon
+  Database // NEW: Database icon
 } from 'lucide-react';
 import { API_BASE_URL, STATUS } from '../utility/constants';
 import axios from 'axios';
@@ -36,6 +38,8 @@ const MerchantDashboard = ({
 }) => {
   const [transactions, setTransactions] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [debugData, setDebugData] = useState(null); // NEW: Debug data state
+  const [showDebug, setShowDebug] = useState(false); // NEW: Debug panel toggle
   const [stats, setStats] = useState({
     totalAmount: 0,
     totalTransactions: 0,
@@ -45,6 +49,7 @@ const MerchantDashboard = ({
     successRate: 0
   });
   const [loading, setLoading] = useState(false);
+  const [debugLoading, setDebugLoading] = useState(false); // NEW: Debug loading state
   const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
@@ -86,7 +91,8 @@ const MerchantDashboard = ({
       const queryString = params.toString();
       const url = `${API_BASE_URL}/transactions/analytics${queryString ? '?' + queryString : ''}`;
       
-      console.log('Fetching analytics from:', url);
+      console.log('🔍 Fetching analytics from:', url);
+      console.log('🔑 Using token:', token ? 'Present' : 'Missing');
 
       const response = await axios.get(url, {
         headers: {
@@ -94,6 +100,8 @@ const MerchantDashboard = ({
           'Content-Type': 'application/json'
         }
       });
+
+      console.log('📊 Analytics response:', response.data);
 
       if (response.data.status === 'success') {
         const analyticsData = response.data.analytics;
@@ -108,17 +116,56 @@ const MerchantDashboard = ({
           failedPayments: analyticsData.summary.failedTransactions,
           successRate: analyticsData.summary.successRate
         });
+
+        // ✅ ENHANCED: Log detailed analytics for debugging
+        console.log('📈 Analytics Summary:', analyticsData.summary);
+        console.log('📋 Transactions found:', analyticsData.transactions?.length || 0);
       }
     } catch (error) {
-      console.error('Analytics fetch error:', error);
-      setError('Failed to load analytics data');
+      console.error('💥 Analytics fetch error:', error);
+      console.error('📋 Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+      setError(`Failed to load analytics data: ${error.response?.data?.error || error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
+  // NEW: Debug function to check data consistency
+  const fetchDebugData = async () => {
+    if (!token) return;
+
+    setDebugLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/transactions/debug`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('🐛 Debug response:', response.data);
+      
+      if (response.data.status === 'success') {
+        setDebugData(response.data.debug);
+        setShowDebug(true);
+      }
+    } catch (error) {
+      console.error('💥 Debug fetch error:', error);
+      setError(`Debug failed: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
   const handleRefresh = () => {
     fetchAnalytics();
+    if (showDebug) {
+      fetchDebugData();
+    }
   };
 
   const handleFilterChange = (filterType, value) => {
@@ -166,13 +213,31 @@ const MerchantDashboard = ({
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    
+    try {
+      // Handle Firestore timestamp
+      if (dateString.seconds) {
+        return new Date(dateString.seconds * 1000).toLocaleDateString('en-KE', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      return new Date(dateString).toLocaleDateString('en-KE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return 'Invalid Date';
+    }
   };
 
   const exportData = () => {
@@ -235,6 +300,28 @@ const MerchantDashboard = ({
               <User className="w-4 h-4" />
               <span>{user?.email}</span>
             </div>
+
+            {/* NEW: Debug Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (!showDebug) {
+                  fetchDebugData();
+                } else {
+                  setShowDebug(false);
+                }
+              }}
+              disabled={debugLoading}
+              className="text-white hover:bg-blue-700"
+              title="Debug Data"
+            >
+              {debugLoading ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Bug className="w-5 h-5" />
+              )}
+            </Button>
             
             {/* Filter Toggle */}
             <Button
@@ -328,6 +415,85 @@ const MerchantDashboard = ({
           </Card>
         )}
 
+        {/* NEW: Debug Panel */}
+        {showDebug && debugData && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-800">
+                <Database className="w-5 h-5" />
+                Debug Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Database Stats</h4>
+                  <div className="space-y-1 text-sm">
+                    <div>Total DB Records: <span className="font-mono">{debugData.totalTransactions}</span></div>
+                    <div>Your Transactions: <span className="font-mono">{debugData.merchantTransactions}</span></div>
+                    <div>Your Merchant ID: <span className="font-mono text-xs">{debugData.merchantId}</span></div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Field Issues</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className={debugData.fieldIssues.missingMerchantId > 0 ? 'text-red-600' : 'text-green-600'}>
+                      Missing Merchant ID: {debugData.fieldIssues.missingMerchantId}
+                    </div>
+                    <div className={debugData.fieldIssues.missingCheckoutRequestID > 0 ? 'text-red-600' : 'text-green-600'}>
+                      Missing Checkout ID: {debugData.fieldIssues.missingCheckoutRequestID}
+                    </div>
+                    <div>With Callbacks: {debugData.fieldIssues.withCallbacks}</div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Status Breakdown</h4>
+                  <div className="space-y-1 text-sm">
+                    <div>Pending: <span className="text-yellow-600">{debugData.fieldIssues.pendingTransactions}</span></div>
+                    <div>Successful: <span className="text-green-600">{debugData.fieldIssues.successfulTransactions}</span></div>
+                  </div>
+                </div>
+              </div>
+              
+              {debugData.recentTransactions?.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="font-semibold text-sm mb-2">Recent Transactions Sample</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-1">ID</th>
+                          <th className="text-left p-1">Amount</th>
+                          <th className="text-left p-1">Status</th>
+                          <th className="text-left p-1">Phone</th>
+                          <th className="text-left p-1">Callback?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugData.recentTransactions.slice(0, 3).map((tx, index) => (
+                          <tr key={index} className="border-b">
+                            <td className="p-1 font-mono">{tx.id.substring(0, 8)}...</td>
+                            <td className="p-1">{tx.amount}</td>
+                            <td className="p-1">
+                              <Badge variant={tx.status === 'success' ? 'success' : tx.status === 'pending' ? 'warning' : 'error'}>
+                                {tx.status}
+                              </Badge>
+                            </td>
+                            <td className="p-1 font-mono">{tx.phoneNumber}</td>
+                            <td className="p-1">{tx.hasCallbackData ? '✅' : '❌'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {onNavigateToScanner && (
@@ -356,6 +522,9 @@ const MerchantDashboard = ({
             </div>
           </Button>
         </div>
+
+        {/* Rest of your existing component code remains the same... */}
+        {/* Key Metrics, Filters, Status Breakdown, etc. */}
 
         {/* Filters */}
         {showFilters && (
@@ -597,7 +766,7 @@ const MerchantDashboard = ({
           </Card>
         )}
 
-        {/* Recent Transactions */}
+        {/* Enhanced Recent Transactions with Better Error Handling */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Transactions</CardTitle>
@@ -622,9 +791,9 @@ const MerchantDashboard = ({
                   </thead>
                   <tbody>
                     {analytics.transactions.slice(0, 10).map((transaction, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
+                      <tr key={transaction.id || index} className="border-b hover:bg-gray-50">
                         <td className="p-3 font-mono text-sm">
-                          {transaction.phoneNumber}
+                          {transaction.phoneNumber || 'N/A'}
                         </td>
                         <td className="p-3 font-semibold">
                           {formatCurrency(transaction.amount)}
@@ -636,7 +805,7 @@ const MerchantDashboard = ({
                           {formatDate(transaction.createdAt)}
                         </td>
                         <td className="p-3 text-sm font-mono">
-                          {transaction.transactionRef || 'N/A'}
+                          {transaction.transactionRef || transaction.id?.substring(0, 8) || 'N/A'}
                         </td>
                       </tr>
                     ))}
@@ -647,6 +816,16 @@ const MerchantDashboard = ({
               <div className="text-center py-8 text-gray-500">
                 <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No transactions found</p>
+                {showDebug && debugData && (
+                  <div className="mt-2 text-sm">
+                    <p>Debug: {debugData.merchantTransactions} transactions in database for your merchant ID</p>
+                    {debugData.merchantTransactions > 0 && (
+                      <p className="text-red-500">
+                        ⚠️ Transactions exist but aren't displaying. Check field consistency.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -656,4 +835,4 @@ const MerchantDashboard = ({
   );
 };
 
-export default MerchantDashboard
+export default MerchantDashboard;

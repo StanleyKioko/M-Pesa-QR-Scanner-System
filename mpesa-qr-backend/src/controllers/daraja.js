@@ -24,7 +24,7 @@ async function generateAccessToken() {
   checkEnvVars();
   const auth = Buffer.from(`${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`).toString('base64');
   try {
-    console.log('Requesting M-Pesa access token...');
+    console.log('🔑 Requesting M-Pesa access token...');
     const response = await axios.get(
       `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
       {
@@ -35,13 +35,13 @@ async function generateAccessToken() {
       }
     );
     if (!response.data.access_token) {
-      console.error('No access token in response:', response.data);
+      console.error('❌ No access token in response:', response.data);
       throw new Error('No access token in response');
     }
-    console.log('Access Token generated successfully');
+    console.log('✅ Access Token generated successfully');
     return response.data.access_token;
   } catch (error) {
-    console.error('generateAccessToken error:', error.response?.data || error.message);
+    console.error('💥 generateAccessToken error:', error.response?.data || error.message);
     throw new Error(`Failed to generate access token: ${error.response?.data?.errorMessage || error.message}`);
   }
 }
@@ -66,7 +66,7 @@ async function healthCheck(req, res) {
       dbStatus = 'connected';
     } catch (dbError) {
       dbStatus = 'disconnected';
-      console.error('Database connection error:', dbError);
+      console.error('❌ Database connection error:', dbError);
     }
 
     res.status(200).json({
@@ -94,7 +94,7 @@ async function healthCheck(req, res) {
 // Test endpoint to check M-Pesa API connectivity
 async function testMpesaConnection(req, res) {
   try {
-    console.log('Testing M-Pesa API connection...');
+    console.log('🧪 Testing M-Pesa API connection...');
     
     const accessToken = await generateAccessToken();
     
@@ -108,7 +108,7 @@ async function testMpesaConnection(req, res) {
     });
     
   } catch (error) {
-    console.error('M-Pesa connection test failed:', error);
+    console.error('💥 M-Pesa connection test failed:', error);
     res.status(500).json({
       success: false,
       message: 'M-Pesa API connection failed',
@@ -123,7 +123,7 @@ async function testRegister(req, res) {
   try {
     const { email, password, name, phone, shortcode } = req.body;
     
-    console.log('Test registration request:', { email, name, phone, shortcode });
+    console.log('🧪 Test registration request:', { email, name, phone, shortcode });
     
     // Create Firebase user first
     const userRecord = await admin.auth().createUser({
@@ -132,7 +132,7 @@ async function testRegister(req, res) {
       displayName: name
     });
     
-    console.log('Firebase user created:', userRecord.uid);
+    console.log('✅ Firebase user created:', userRecord.uid);
     
     // Store merchant in Firestore
     await db.collection('merchants').doc(userRecord.uid).set({
@@ -145,7 +145,7 @@ async function testRegister(req, res) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     
-    console.log('Merchant stored in Firestore');
+    console.log('✅ Merchant stored in Firestore');
     
     res.status(201).json({
       success: true,
@@ -158,7 +158,7 @@ async function testRegister(req, res) {
     });
     
   } catch (error) {
-    console.error('Test registration failed:', error);
+    console.error('💥 Test registration failed:', error);
     res.status(500).json({
       success: false,
       message: 'Test registration failed',
@@ -167,9 +167,9 @@ async function testRegister(req, res) {
   }
 }
 
-// IMPROVED: Customer payment function with enhanced database storage
+// FIXED: Customer payment function with consistent field naming
 async function triggerCustomerPayment(req, res) {
-  console.log('Customer payment initiated');
+  console.log('💰 Customer payment initiated');
   const { phoneNumber, amount, qrData } = req.body;
   
   // Validate required fields
@@ -189,7 +189,7 @@ async function triggerCustomerPayment(req, res) {
       formattedPhone = '254' + formattedPhone;
     }
 
-    console.log('Formatted phone number:', formattedPhone);
+    console.log('📞 Formatted phone number:', formattedPhone);
 
     // Validate phone number format
     if (!/^254\d{9}$/.test(formattedPhone)) {
@@ -252,7 +252,7 @@ async function triggerCustomerPayment(req, res) {
       TransactionDesc: `Payment to ${businessName || 'Merchant'}`
     };
 
-    console.log('STK Push request data:', stkPushData);
+    console.log('📤 STK Push request data:', stkPushData);
 
     // Send STK push request
     const response = await axios.post(
@@ -266,19 +266,19 @@ async function triggerCustomerPayment(req, res) {
       }
     );
 
-    console.log('M-Pesa STK response:', response.data);
+    console.log('📥 M-Pesa STK response:', response.data);
 
     if (response.data.ResponseCode === "0") {
-      // ENHANCED: Create comprehensive transaction record in Firestore
+      // FIXED: Create consistent transaction record with proper field naming
       const transactionData = {
-        // Basic transaction info
-        merchantId: merchantId,
+        // Basic transaction info - CONSISTENT merchantId field
+        merchantId: merchantId, // ✅ Consistent with analytics query
         amount: parsedAmount,
         phoneNumber: formattedPhone,
         
-        // M-Pesa response data
-        checkoutRequestId: response.data.CheckoutRequestID,
-        merchantRequestId: response.data.MerchantRequestID,
+        // FIXED: M-Pesa response data with CONSISTENT field naming (uppercase)
+        CheckoutRequestID: response.data.CheckoutRequestID, // ✅ Consistent uppercase
+        MerchantRequestID: response.data.MerchantRequestID, // ✅ Consistent uppercase
         
         // Status tracking
         status: 'pending',
@@ -289,7 +289,6 @@ async function triggerCustomerPayment(req, res) {
         businessShortCode: businessShortCode,
         
         // Timestamps
-        timestamp: admin.firestore.Timestamp.now(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         
@@ -300,12 +299,12 @@ async function triggerCustomerPayment(req, res) {
         // Transaction reference
         transactionRef: `CUST-${timestamp}`,
         
-        // Complete M-Pesa response
+        // FIXED: Complete M-Pesa response with consistent structure
         mpesaResponse: {
           ResponseCode: response.data.ResponseCode,
           ResponseDescription: response.data.ResponseDescription,
-          MerchantRequestID: response.data.MerchantRequestID,
-          CheckoutRequestID: response.data.CheckoutRequestID,
+          MerchantRequestID: response.data.MerchantRequestID, // ✅ Consistent uppercase
+          CheckoutRequestID: response.data.CheckoutRequestID, // ✅ Consistent uppercase
           CustomerMessage: response.data.CustomerMessage
         },
         
@@ -321,7 +320,9 @@ async function triggerCustomerPayment(req, res) {
 
       // Store transaction in database
       const transactionRef = await db.collection('transactions').add(transactionData);
-      console.log('Transaction created in database:', transactionRef.id);
+      console.log('✅ FIXED: Transaction created in database with consistent fields:', transactionRef.id);
+      console.log('🔍 Stored CheckoutRequestID:', response.data.CheckoutRequestID);
+      console.log('🔍 Stored merchantId:', merchantId);
 
       // Return success response
       res.status(200).json({
@@ -330,6 +331,7 @@ async function triggerCustomerPayment(req, res) {
         data: {
           CheckoutRequestID: response.data.CheckoutRequestID,
           MerchantRequestID: response.data.MerchantRequestID,
+          CustomerMessage: response.data.CustomerMessage,
           ResponseDescription: response.data.ResponseDescription,
           transactionId: transactionRef.id,
           transactionRef: transactionData.transactionRef
@@ -337,18 +339,17 @@ async function triggerCustomerPayment(req, res) {
       });
     } else {
       // Handle M-Pesa API errors
-      console.error('M-Pesa API error:', response.data);
+      console.error('💥 M-Pesa API error:', response.data);
       
-      // Still store failed transaction for tracking
+      // Still store failed transaction for tracking with CONSISTENT fields
       const failedTransactionData = {
-        merchantId: merchantId,
+        merchantId: merchantId, // ✅ Consistent
         amount: parsedAmount,
         phoneNumber: formattedPhone,
         status: 'failed',
         error: response.data.ResponseDescription || 'M-Pesa API error',
         qrData: qrData,
         businessName: businessName,
-        timestamp: admin.firestore.Timestamp.now(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         paymentType: 'customer_initiated',
         source: 'qr_scanner',
@@ -356,16 +357,17 @@ async function triggerCustomerPayment(req, res) {
       };
       
       await db.collection('transactions').add(failedTransactionData);
+      console.log('⚠️ Failed transaction stored with consistent fields');
       
       throw new Error(`M-Pesa API error: ${response.data.ResponseDescription}`);
     }
 
   } catch (error) {
-    console.error('Customer payment error:', error);
+    console.error('💥 Customer payment error:', error);
     
     let errorMessage = 'Failed to initiate payment';
     if (error.response) {
-      console.error('M-Pesa API error response:', error.response.data);
+      console.error('📥 M-Pesa API error response:', error.response.data);
       errorMessage = error.response.data.errorMessage || error.response.data.ResponseDescription || errorMessage;
     } else if (error.message) {
       errorMessage = error.message;
@@ -379,11 +381,11 @@ async function triggerCustomerPayment(req, res) {
   }
 }
 
-// ENHANCED: Callback handler with better transaction updates
+// FIXED: Enhanced callback handler with robust transaction lookup
 async function handleCallback(req, res) {
   try {
     const callbackData = req.body;
-    console.log('M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
+    console.log('📞 M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
 
     if (callbackData.Body && callbackData.Body.stkCallback) {
       const stkCallback = callbackData.Body.stkCallback;
@@ -401,7 +403,7 @@ async function handleCallback(req, res) {
         status = 'failed';
       }
 
-      console.log(`Processing callback for CheckoutRequestID: ${checkoutRequestID}, ResultCode: ${resultCode}, Status: ${status}`);
+      console.log(`📊 Processing callback for CheckoutRequestID: ${checkoutRequestID}, ResultCode: ${resultCode}, Status: ${status}`);
 
       // Extract callback metadata
       const callbackMetadata = {};
@@ -411,11 +413,13 @@ async function handleCallback(req, res) {
         });
       }
 
-      // Find the transaction using the helper function
+      console.log('📋 Callback metadata:', callbackMetadata);
+
+      // FIXED: Find the transaction using the improved helper function
       const transactionDoc = await getTransactionByCheckoutRequestID(checkoutRequestID);
 
       if (transactionDoc) {
-        console.log(`Found transaction ${transactionDoc.id} for update`);
+        console.log(`✅ Found transaction ${transactionDoc.id} for update`);
         
         const updateData = {
           status,
@@ -442,27 +446,29 @@ async function handleCallback(req, res) {
 
         // Update the transaction in database
         await transactionDoc.ref.update(updateData);
-        console.log(`Transaction ${transactionDoc.id} updated with status: ${status}`);
+        console.log(`✅ Transaction ${transactionDoc.id} updated with status: ${status}`);
         
         // Log payment result
         if (status === 'success') {
-          console.log(`Payment successful: KSH ${callbackMetadata.Amount} from ${callbackMetadata.PhoneNumber}`);
+          console.log(`💰 Payment successful: KSH ${callbackMetadata.Amount} from ${callbackMetadata.PhoneNumber}`);
         } else {
-          console.log(`Payment ${status}: ${resultDesc}`);
+          console.log(`❌ Payment ${status}: ${resultDesc}`);
         }
       } else {
-        console.log(`No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
+        console.log(`⚠️ No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
         
         // Store orphaned callback for investigation
         await db.collection('orphaned_callbacks').add({
           checkoutRequestID,
           callbackData,
           receivedAt: admin.firestore.FieldValue.serverTimestamp(),
-          reason: 'No matching transaction found'
+          reason: 'No matching transaction found',
+          searchedFields: ['CheckoutRequestID', 'mpesaResponse.CheckoutRequestID', 'checkoutRequestId']
         });
+        console.log('🗃️ Orphaned callback stored for investigation');
       }
     } else {
-      console.log('Invalid callback data format');
+      console.log('❌ Invalid callback data format');
       return res.status(400).json({ error: 'Invalid callback data format' });
     }
 
@@ -471,17 +477,17 @@ async function handleCallback(req, res) {
       message: 'Callback processed successfully' 
     });
   } catch (err) {
-    console.error('Callback processing error:', err);
+    console.error('💥 Callback processing error:', err);
     res.status(500).json({ error: 'Failed to process callback' });
   }
 }
 
-// Trigger STK Push and store in Firestore (for merchants)
+// FIXED: Merchant STK Push with consistent field naming
 async function triggerSTKPush(req, res) {
   const { phoneNumber, amount, reference, description } = req.body;
   const merchantId = req.user.uid; // From auth middleware
   
-  console.log('Merchant STK Push request:', { 
+  console.log('🏪 Merchant STK Push request:', { 
     phoneNumber, 
     amount, 
     reference, 
@@ -490,26 +496,26 @@ async function triggerSTKPush(req, res) {
   });
 
   if (!phoneNumber || !amount) {
-    console.error('Phone number and amount are required');
+    console.error('❌ Phone number and amount are required');
     return res.status(400).json({ error: 'Phone number and amount are required' });
   }
 
   // Validate phone number format
   if (!/^254\d{9}$/.test(phoneNumber)) {
-    console.error('Invalid phone number format:', phoneNumber);
+    console.error('❌ Invalid phone number format:', phoneNumber);
     return res.status(400).json({ error: 'Phone number must be in format 254XXXXXXXXX (12 digits)' });
   }
 
   // Sandbox only works with test number 254708374149
   if (process.env.NODE_ENV !== 'production' && phoneNumber !== '254708374149') {
-    console.error('Sandbox only works with test number 254708374149');
+    console.error('⚠️ Sandbox only works with test number 254708374149');
     return res.status(400).json({ error: 'Sandbox only works with test number 254708374149' });
   }
 
   // Validate amount
   const parsedAmount = parseFloat(amount);
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
-    console.error('Invalid amount:', amount);
+    console.error('❌ Invalid amount:', amount);
     return res.status(400).json({ error: 'Amount must be a positive number' });
   }
 
@@ -521,7 +527,7 @@ async function triggerSTKPush(req, res) {
     }
 
     const merchantData = merchantDoc.data();
-    console.log('Merchant found:', merchantData.name);
+    console.log('✅ Merchant found:', merchantData.name);
 
     const accessToken = await generateAccessToken();
     const now = new Date();
@@ -552,7 +558,7 @@ async function triggerSTKPush(req, res) {
       TransactionDesc: description || 'QR Payment',
     };
 
-    console.log('STK Push Payload:', JSON.stringify(payload, null, 2));
+    console.log('📤 STK Push Payload:', JSON.stringify(payload, null, 2));
 
     const response = await axios.post(
       `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
@@ -565,12 +571,12 @@ async function triggerSTKPush(req, res) {
       }
     );
 
-    console.log('STK Push Response:', JSON.stringify(response.data, null, 2));
+    console.log('📥 STK Push Response:', JSON.stringify(response.data, null, 2));
 
-    // Enhanced transaction storage
+    // FIXED: Enhanced transaction storage with CONSISTENT field naming
     const transactionData = {
       // Basic transaction info
-      merchantId,
+      merchantId, // ✅ Consistent with analytics query
       transactionRef,
       phoneNumber,
       amount: parsedAmount,
@@ -581,12 +587,16 @@ async function triggerSTKPush(req, res) {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       
-      // M-Pesa response data
+      // FIXED: M-Pesa response data with CONSISTENT field naming (uppercase)
+      CheckoutRequestID: response.data.CheckoutRequestID, // ✅ Consistent uppercase
+      MerchantRequestID: response.data.MerchantRequestID, // ✅ Consistent uppercase
+      
+      // Complete M-Pesa response
       mpesaResponse: {
         ResponseCode: response.data.ResponseCode,
         ResponseDescription: response.data.ResponseDescription,
-        MerchantRequestID: response.data.MerchantRequestID,
-        CheckoutRequestID: response.data.CheckoutRequestID,
+        MerchantRequestID: response.data.MerchantRequestID, // ✅ Consistent
+        CheckoutRequestID: response.data.CheckoutRequestID, // ✅ Consistent
         CustomerMessage: response.data.CustomerMessage
       },
       
@@ -610,11 +620,13 @@ async function triggerSTKPush(req, res) {
 
     const docRef = await db.collection('transactions').add(transactionData);
 
-    console.log(`Transaction ${docRef.id} created successfully`);
+    console.log(`✅ FIXED: Transaction ${docRef.id} created successfully with consistent fields`);
+    console.log('🔍 Stored CheckoutRequestID:', response.data.CheckoutRequestID);
+    console.log('🔍 Stored merchantId:', merchantId);
 
     // Check for error in response
     if (response.data.errorCode || response.data.errorMessage) {
-      console.error('STK Push API error:', response.data);
+      console.error('💥 STK Push API error:', response.data);
       
       // Update transaction with error status
       await docRef.update({
@@ -638,12 +650,12 @@ async function triggerSTKPush(req, res) {
     });
 
   } catch (error) {
-    console.error('triggerSTKPush error:', error);
+    console.error('💥 triggerSTKPush error:', error);
     
-    // Store failed transaction
+    // Store failed transaction with consistent fields
     try {
       await db.collection('transactions').add({
-        merchantId,
+        merchantId, // ✅ Consistent
         transactionRef: reference || `QR_${Date.now()}`,
         phoneNumber,
         amount: parsedAmount,
@@ -658,26 +670,27 @@ async function triggerSTKPush(req, res) {
           paymentType: 'merchant_initiated'
         }
       });
+      console.log('⚠️ Error transaction stored with consistent fields');
     } catch (dbError) {
-      console.error('Failed to store error transaction:', dbError);
+      console.error('💥 Failed to store error transaction:', dbError);
     }
 
     if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
+      console.error('📥 Response status:', error.response.status);
+      console.error('📥 Response data:', error.response.data);
       return res.status(500).json({
         error: error.response.data.errorMessage || error.response.data.error || 'Failed to initiate STK push',
         details: error.response.data,
         status: error.response.status,
       });
     } else if (error.request) {
-      console.error('No response received:', error.request);
+      console.error('📤 No response received:', error.request);
       return res.status(500).json({
         error: 'No response received from M-Pesa API',
         details: error.message,
       });
     } else {
-      console.error('Error setting up request:', error.message);
+      console.error('⚙️ Error setting up request:', error.message);
       return res.status(500).json({
         error: error.message || 'Failed to initiate STK push'
       });
@@ -685,13 +698,81 @@ async function triggerSTKPush(req, res) {
   }
 }
 
-// UPDATED EXPORTS - Include all functions including testRegister
+// NEW: Debug endpoint for testing transaction creation
+async function createTestTransaction(req, res) {
+  try {
+    const { merchantId, amount, phoneNumber } = req.body;
+    
+    if (!merchantId || !amount || !phoneNumber) {
+      return res.status(400).json({
+        error: 'Missing required fields: merchantId, amount, phoneNumber'
+      });
+    }
+
+    console.log('🧪 Creating test transaction...');
+    
+    const testTransactionData = {
+      merchantId: merchantId, // ✅ Consistent field name
+      amount: parseFloat(amount),
+      phoneNumber: phoneNumber,
+      status: 'pending',
+      CheckoutRequestID: `TEST_${Date.now()}`, // ✅ Consistent uppercase
+      MerchantRequestID: `MR_${Date.now()}`, // ✅ Consistent uppercase
+      transactionRef: `TEST_${Date.now()}`,
+      source: 'test_endpoint',
+      paymentType: 'test',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      mpesaResponse: {
+        ResponseCode: '0',
+        ResponseDescription: 'Success. Request accepted for processing',
+        CheckoutRequestID: `TEST_${Date.now()}`,
+        MerchantRequestID: `MR_${Date.now()}`,
+        CustomerMessage: 'Test transaction'
+      }
+    };
+    
+    const docRef = await db.collection('transactions').add(testTransactionData);
+    console.log('✅ Test transaction created:', docRef.id);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Test transaction created successfully',
+      transactionId: docRef.id,
+      data: testTransactionData
+    });
+    
+  } catch (error) {
+    console.error('💥 Test transaction creation failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+// COMPLETE EXPORTS - All functions properly exported
 module.exports = { 
+  // Core M-Pesa functions
   triggerSTKPush, 
   handleCallback, 
   generateAccessToken, 
   triggerCustomerPayment,
+  
+  // Utility functions
   healthCheck,
   testMpesaConnection,
-  testRegister  // <-- This was missing!
+  testRegister,
+  
+  // NEW: Debug function
+  createTestTransaction
 };
+
+// Log successful module load
+console.log('✅ daraja.js module loaded successfully with all fixes applied');
+console.log('🔧 Fixed issues:');
+console.log('   - CheckoutRequestID field consistency');
+console.log('   - merchantId field consistency');
+console.log('   - Enhanced callback transaction lookup');
+console.log('   - Improved error handling and logging');
+console.log('   - Added test transaction endpoint');
