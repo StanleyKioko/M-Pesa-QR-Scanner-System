@@ -94,26 +94,22 @@ async function healthCheck(req, res) {
 // Test endpoint to check M-Pesa API connectivity
 async function testMpesaConnection(req, res) {
   try {
-    console.log('🧪 Testing M-Pesa API connection...');
-    
     const accessToken = await generateAccessToken();
-    
     res.status(200).json({
-      success: true,
+      status: 'success',
       message: 'M-Pesa API connection successful',
-      environment: process.env.NODE_ENV || 'development',
-      baseUrl: MPESA_BASE_URL,
-      hasToken: !!accessToken,
-      timestamp: new Date().toISOString()
+      hasAccessToken: !!accessToken,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+      baseUrl: MPESA_BASE_URL
     });
-    
   } catch (error) {
     console.error('💥 M-Pesa connection test failed:', error);
     res.status(500).json({
-      success: false,
+      status: 'failed',
       message: 'M-Pesa API connection failed',
       error: error.message,
-      environment: process.env.NODE_ENV || 'development'
+      timestamp: new Date().toISOString()
     });
   }
 }
@@ -271,56 +267,31 @@ async function triggerCustomerPayment(req, res) {
     if (response.data.ResponseCode === "0") {
       // FIXED: Create consistent transaction record with proper field naming
       const transactionData = {
-        // Basic transaction info - CONSISTENT merchantId field
-        merchantId: merchantId, // ✅ Consistent with analytics query
+        merchantId: merchantId, // ✅ Consistent field name
         amount: parsedAmount,
         phoneNumber: formattedPhone,
+        status: 'pending',
         
-        // FIXED: M-Pesa response data with CONSISTENT field naming (uppercase)
+        // FIXED: Consistent uppercase field names for M-Pesa identifiers
         CheckoutRequestID: response.data.CheckoutRequestID, // ✅ Consistent uppercase
         MerchantRequestID: response.data.MerchantRequestID, // ✅ Consistent uppercase
         
-        // Status tracking
-        status: 'pending',
-        
-        // QR and merchant data
+        transactionRef: `CUST_${timestamp}`,
         qrData: qrData,
         businessName: businessName,
-        businessShortCode: businessShortCode,
-        
-        // Timestamps
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         
+        // M-Pesa response
+        mpesaResponse: response.data,
+        
         // Payment metadata
         paymentType: 'customer_initiated',
-        source: 'qr_scanner',
-        
-        // Transaction reference
-        transactionRef: `CUST-${timestamp}`,
-        
-        // FIXED: Complete M-Pesa response with consistent structure
-        mpesaResponse: {
-          ResponseCode: response.data.ResponseCode,
-          ResponseDescription: response.data.ResponseDescription,
-          MerchantRequestID: response.data.MerchantRequestID, // ✅ Consistent uppercase
-          CheckoutRequestID: response.data.CheckoutRequestID, // ✅ Consistent uppercase
-          CustomerMessage: response.data.CustomerMessage
-        },
-        
-        // Additional metadata
-        metadata: {
-          apiVersion: 'v1',
-          environment: process.env.NODE_ENV,
-          timestamp: timestamp,
-          userAgent: req.headers['user-agent'] || '',
-          ipAddress: req.ip || req.connection.remoteAddress
-        }
+        source: 'qr_scanner'
       };
 
-      // Store transaction in database
       const transactionRef = await db.collection('transactions').add(transactionData);
-      console.log('✅ FIXED: Transaction created in database with consistent fields:', transactionRef.id);
+      console.log(`✅ FIXED: Customer transaction ${transactionRef.id} created with consistent fields`);
       console.log('🔍 Stored CheckoutRequestID:', response.data.CheckoutRequestID);
       console.log('🔍 Stored merchantId:', merchantId);
 
@@ -751,6 +722,132 @@ async function createTestTransaction(req, res) {
   }
 }
 
+// Generate QR code for merchant
+async function generateMerchantQR(req, res) {
+  try {
+    const merchantId = req.user.uid; // From auth middleware
+    const { amount, description, reference, includeAmount } = req.body;
+    
+    console.log('🔗 Generating QR code for merchant:', merchantId);
+    
+    // Get merchant details from Firestore
+    const merchantDoc = await db.collection('merchants').doc(merchantId).get();
+    if (!merchantDoc.exists) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Merchant not found' 
+      });
+    }
+    
+    const merchantData = merchantDoc.data();
+    console.log('✅ Merchant found:', merchantData.name);
+    
+    // Validate amount if provided
+    let parsedAmount = null;
+    if (includeAmount && amount) {
+      parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Amount must be a positive number'
+        });
+      }
+    }
+    
+    // Generate unique reference if not provided
+    const qrReference = reference || `QR_${Date.now()}`;
+    
+    // Create QR data payload
+    const qrPayload = {
+      version: '1.0',
+      type: 'merchant_payment',
+      merchantId: merchantId,
+      businessName: merchantData.name || 'M-Pesa Merchant',
+      businessShortCode: merchantData.shortcode || process.env.MPESA_SHORTCODE,
+      phone: merchantData.phone || '',
+      amount: parsedAmount,
+      description: description || 'Payment',
+      reference: qrReference,
+      timestamp: new Date().toISOString(),
+      // Additional metadata
+      metadata: {
+        generated: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        apiVersion: 'v1'
+      }
+    };
+    
+    // Convert to QR string (JSON format)
+    const qrString = JSON.stringify(qrPayload);
+    
+    // Generate shareable payment link
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const shareableLink = `${baseUrl}/pay?data=${encodeURIComponent(qrString)}`;
+    
+    // Store QR generation record for analytics
+    try {
+      await db.collection('qr_codes').add({
+        merchantId: merchantId,
+        reference: qrReference,
+        amount: parsedAmount,
+        description: description || 'Payment',
+        payload: qrPayload,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: null, // QR codes don't expire by default
+        isActive: true,
+        usage: {
+          scans: 0,
+          lastScanned: null
+        }
+      });
+      console.log('📊 QR generation recorded for analytics');
+    } catch (analyticsError) {
+      console.warn('⚠️ Failed to record QR analytics:', analyticsError.message);
+      // Don't fail the request if analytics fails
+    }
+    
+    // Success response
+    res.status(200).json({
+      success: true,
+      message: 'QR code generated successfully',
+      data: {
+        qrCode: {
+          payload: qrPayload,
+          qrString: qrString,
+          reference: qrReference
+        },
+        merchant: {
+          name: merchantData.name,
+          phone: merchantData.phone,
+          shortcode: merchantData.shortcode || process.env.MPESA_SHORTCODE
+        },
+        sharing: {
+          shareableLink: shareableLink,
+          displayText: parsedAmount 
+            ? `Pay KSH ${parsedAmount} to ${merchantData.name}` 
+            : `Payment to ${merchantData.name}`,
+          qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrString)}`
+        },
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          expiresAt: null,
+          version: '1.0'
+        }
+      }
+    });
+    
+    console.log('✅ QR code generated successfully for:', merchantData.name);
+    
+  } catch (error) {
+    console.error('💥 Generate QR error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate QR code',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
 // COMPLETE EXPORTS - All functions properly exported
 module.exports = { 
   // Core M-Pesa functions
@@ -763,8 +860,9 @@ module.exports = {
   healthCheck,
   testMpesaConnection,
   testRegister,
+  generateMerchantQR, // ✅ QR Generator function added
   
-  // NEW: Debug function
+  // Debug function
   createTestTransaction
 };
 
@@ -776,3 +874,4 @@ console.log('   - merchantId field consistency');
 console.log('   - Enhanced callback transaction lookup');
 console.log('   - Improved error handling and logging');
 console.log('   - Added test transaction endpoint');
+console.log('   - Added QR code generation endpoint'); // New log

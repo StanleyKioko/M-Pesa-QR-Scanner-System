@@ -25,6 +25,7 @@ router.post('/customer-payment', triggerCustomerPayment);
 // POST /api/trigger-stk-push (requires authentication)
 router.post('/trigger-stk-push', verifyToken, triggerSTKPush);
 
+// QR Generator endpoint
 router.post("/generate-qr", verifyToken, generateMerchantQR);
 
 // POST /daraja/stk-callback (public endpoint for M-Pesa callbacks)
