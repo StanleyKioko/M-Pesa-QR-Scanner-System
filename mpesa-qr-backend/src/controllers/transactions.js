@@ -55,7 +55,7 @@ function serializeTransaction(transaction) {
   return serialized;
 }
 
-// ✅ ENHANCED: Safe query executor with fallback for index issues
+// ENHANCED: Safe query executor with fallback for index issues
 async function executeQueriesWithFallback(directQuery, guestQuery, period, filterDate, endFilterDate) {
   try {
     // Try to execute both queries with date filtering
@@ -63,15 +63,15 @@ async function executeQueriesWithFallback(directQuery, guestQuery, period, filte
       directQuery.get(),
       guestQuery.get()
     ]);
-    
-    console.log(`✅ Successfully executed queries with date filtering`);
+
+    console.log(`Successfully executed queries with date filtering`);
     return [directSnapshot, guestSnapshot];
     
   } catch (error) {
-    console.log(`⚠️ Query with date filtering failed (likely missing index): ${error.message}`);
+    console.log(`Query with date filtering failed (likely missing index): ${error.message}`);
     
     // Fallback: Execute queries without date filtering and filter in memory
-    console.log(`🔄 Falling back to queries without date filtering...`);
+    console.log(`Falling back to queries without date filtering...`);
     
     try {
       // Remove date filtering from queries
@@ -86,11 +86,11 @@ async function executeQueriesWithFallback(directQuery, guestQuery, period, filte
         guestQuerySimple.get()
       ]);
       
-      console.log(`✅ Fallback queries executed successfully`);
+      console.log(`Fallback queries executed successfully`);
       
       // Filter results in memory if date filtering was needed
       if (period !== 'all' && filterDate) {
-        console.log(`🔍 Applying client-side date filtering for period: ${period}`);
+        console.log(`Applying client-side date filtering for period: ${period}`);
         
         const filterDirectDocs = directSnapshot.docs.filter(doc => {
           const createdAt = convertFirestoreTimestamp(doc.data().createdAt);
@@ -114,7 +114,7 @@ async function executeQueriesWithFallback(directQuery, guestQuery, period, filte
           }
         });
         
-        console.log(`📊 Client-side filtering: ${filterDirectDocs.length} direct + ${filterGuestDocs.length} guest transactions`);
+        console.log(`Client-side filtering: ${filterDirectDocs.length} direct + ${filterGuestDocs.length} guest transactions`);
         
         // Create mock snapshots with filtered docs
         return [
@@ -126,13 +126,13 @@ async function executeQueriesWithFallback(directQuery, guestQuery, period, filte
       return [directSnapshot, guestSnapshot];
       
     } catch (fallbackError) {
-      console.error(`💥 Fallback query also failed:`, fallbackError);
+      console.error(`Fallback query also failed:`, fallbackError);
       throw fallbackError;
     }
   }
 }
 
-// ✅ ENHANCED: Create merchant transaction with QR support
+// ENHANCED: Create merchant transaction with QR support
 async function createTransaction(req, res) {
   const { phoneNumber, amount, qrData, reference, description } = req.body;
   const merchantId = req.user.uid;
@@ -144,7 +144,7 @@ async function createTransaction(req, res) {
   try {
     const transactionRef = reference || `Tx_${Date.now()}`;
     
-    // ✅ Enhanced transaction data with QR support
+    // Enhanced transaction data with QR support
     const transactionData = {
       merchantId,
       transactionRef,
@@ -174,7 +174,7 @@ async function createTransaction(req, res) {
 
     const docRef = await db.collection("transactions").add(transactionData);
 
-    console.log(`✅ Transaction ${docRef.id} created successfully - ${qrData ? 'QR-based' : 'Direct API'}`);
+    console.log(`Transaction ${docRef.id} created successfully - ${qrData ? 'QR-based' : 'Direct API'}`);
 
     res.status(201).json({ 
       status: "Transaction successful", 
@@ -190,7 +190,7 @@ async function createTransaction(req, res) {
   }
 }
 
-// ✅ ENHANCED: getTransactions with QR metadata and improved filtering
+// ENHANCED: getTransactions with QR metadata and improved filtering
 async function getTransactions(req, res) {
   const merchantId = req.user.uid;
   const { 
@@ -204,7 +204,7 @@ async function getTransactions(req, res) {
   } = req.query;
 
   try {
-    console.log(`🔍 getTransactions - merchant: ${merchantId}, period: ${period}, status: ${status}, source: ${source}, includeGuest: ${includeGuest}`);
+    console.log(`getTransactions - merchant: ${merchantId}, period: ${period}, status: ${status}, source: ${source}, includeGuest: ${includeGuest}`);
 
     // Calculate date range
     const now = new Date();
@@ -266,7 +266,7 @@ async function getTransactions(req, res) {
       directQuery, guestQuery, period, filterDate, endFilterDate
     );
 
-    console.log(`📊 Found ${directSnapshot.docs.length} direct + ${guestSnapshot.docs.length} guest transactions`);
+    console.log(`Found ${directSnapshot.docs.length} direct + ${guestSnapshot.docs.length} guest transactions`);
 
     // Combine and deduplicate
     const allTransactionDocs = [
@@ -276,7 +276,7 @@ async function getTransactions(req, res) {
       )
     ];
 
-    // ✅ ENHANCED: Map and serialize transactions with QR metadata
+    // ENHANCED: Map and serialize transactions with QR metadata
     let transactions = allTransactionDocs.map(doc => {
       const data = doc.data();
       return serializeTransaction({
@@ -288,7 +288,7 @@ async function getTransactions(req, res) {
           paymentType: data.paymentType || 'unknown',
           source: data.source || 'unknown'
         },
-        // ✅ Enhanced QR metadata
+        // Enhanced QR metadata
         qrMetadata: data.qrMetadata ? {
           ...data.qrMetadata,
           hasQRData: !!data.qrData,
@@ -307,7 +307,7 @@ async function getTransactions(req, res) {
       transactions = transactions.filter(t => t.status === status);
     }
 
-    // ✅ NEW: Apply source filtering for QR vs non-QR transactions
+    // NEW: Apply source filtering for QR vs non-QR transactions
     if (source) {
       transactions = transactions.filter(t => {
         switch (source) {
@@ -328,7 +328,7 @@ async function getTransactions(req, res) {
     // Sort by creation date (newest first)
     transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    console.log(`✅ Returning ${transactions.length} transactions for merchant ${merchantId}`);
+    console.log(`Returning ${transactions.length} transactions for merchant ${merchantId}`);
 
     res.status(200).json({
       status: 'success',
@@ -341,7 +341,7 @@ async function getTransactions(req, res) {
         merchantId: merchantId,
         filters: { period, status, source, includeGuest },
         queryMethod: period === 'all' ? 'direct' : 'fallback-safe',
-        // ✅ Enhanced QR statistics
+        // Enhanced QR statistics
         qrStatistics: {
           qrTransactions: transactions.filter(t => t.qrMetadata?.hasQRData).length,
           customerScannedQR: transactions.filter(t => t.qrMetadata?.qrSource === 'customer_scanned').length,
@@ -356,7 +356,7 @@ async function getTransactions(req, res) {
   }
 }
 
-// ✅ ENHANCED: Transaction analytics with QR insights
+// ENHANCED: Transaction analytics with QR insights
 async function getTransactionAnalytics(req, res) {
   const merchantId = req.user.uid;
   const { 
@@ -369,7 +369,7 @@ async function getTransactionAnalytics(req, res) {
   } = req.query;
 
   try {
-    console.log(`🔍 Analytics request - merchant: ${merchantId}, period: ${period}, status: ${status}, includeQRMetrics: ${includeQRMetrics}`);
+    console.log(`Analytics request - merchant: ${merchantId}, period: ${period}, status: ${status}, includeQRMetrics: ${includeQRMetrics}`);
 
     // Calculate date range
     const now = new Date();
@@ -403,7 +403,7 @@ async function getTransactionAnalytics(req, res) {
           queryStartDate = new Date('2020-01-01');
           break;
       }
-      console.log(`📅 Period: ${period} - from ${queryStartDate.toISOString()}`);
+      console.log(`Period: ${period} - from ${queryStartDate.toISOString()}`);
     }
 
     // Build queries
@@ -431,8 +431,8 @@ async function getTransactionAnalytics(req, res) {
       directMerchantQuery, guestTransactionQuery, period, queryStartDate, queryEndDate
     );
 
-    console.log(`📊 Found ${directSnapshot.docs.length} direct merchant transactions`);
-    console.log(`📊 Found ${guestSnapshot.docs.length} guest transactions`);
+    console.log(`Found ${directSnapshot.docs.length} direct merchant transactions`);
+    console.log(`Found ${guestSnapshot.docs.length} guest transactions`);
 
     // Combine and deduplicate transactions
     const allTransactionDocs = [
@@ -442,9 +442,9 @@ async function getTransactionAnalytics(req, res) {
       )
     ];
 
-    console.log(`📊 Total combined transactions: ${allTransactionDocs.length}`);
+    console.log(`Total combined transactions: ${allTransactionDocs.length}`);
 
-    // ✅ ENHANCED: Map transactions with QR metadata
+    // ENHANCED: Map transactions with QR metadata
     let transactions = allTransactionDocs.map(doc => {
       const data = doc.data();
       return serializeTransaction({ 
@@ -468,7 +468,7 @@ async function getTransactionAnalytics(req, res) {
     // Apply status filtering
     if (status && status !== 'all') {
       transactions = transactions.filter(t => t.status === status);
-      console.log(`🏷️ After status filtering (${status}): ${transactions.length} transactions`);
+      console.log(`After status filtering (${status}): ${transactions.length} transactions`);
     }
 
     // Sort by date (newest first)
@@ -485,7 +485,7 @@ async function getTransactionAnalytics(req, res) {
     const customerInitiated = transactions.filter(t => t.paymentType === 'customer_initiated');
     const merchantInitiated = transactions.filter(t => t.paymentType === 'merchant_initiated');
 
-    // ✅ NEW: QR-specific analytics
+    // NEW: QR-specific analytics
     const qrTransactions = transactions.filter(t => t.qrMetadata?.hasQRData);
     const customerScannedQR = transactions.filter(t => t.qrMetadata?.qrSource === 'customer_scanned');
     const merchantGeneratedQR = transactions.filter(t => t.qrMetadata?.qrSource === 'merchant_generated');
@@ -499,8 +499,8 @@ async function getTransactionAnalytics(req, res) {
       ? totalRevenue / successfulTransactions.length 
       : 0;
 
-    console.log(`💰 Revenue calculation: ${successfulTransactions.length} successful transactions = KSH ${totalRevenue}`);
-    console.log(`📱 QR Revenue: KSH ${qrRevenue} (${qrTransactions.length} QR transactions)`);
+    console.log(`Revenue calculation: ${successfulTransactions.length} successful transactions = KSH ${totalRevenue}`);
+    console.log(`QR Revenue: KSH ${qrRevenue} (${qrTransactions.length} QR transactions)`);
 
     // Calculate daily summaries with QR insights
     const dailySummaries = {};
@@ -545,7 +545,7 @@ async function getTransactionAnalytics(req, res) {
         summary.guestMerchant++;
       }
 
-      // ✅ QR tracking
+      // QR tracking
       if (transaction.qrMetadata?.hasQRData) {
         summary.qrTransactions++;
         if (transaction.qrMetadata?.qrSource === 'customer_scanned') {
@@ -588,7 +588,7 @@ async function getTransactionAnalytics(req, res) {
       ? (qrTransactions.length / totalTransactions * 100).toFixed(1)
       : 0;
 
-    // ✅ ENHANCED: Analytics with QR insights
+    // ENHANCED: Analytics with QR insights
     const analytics = {
       period,
       status: status || 'all',  
@@ -611,7 +611,7 @@ async function getTransactionAnalytics(req, res) {
           merchantInitiated: merchantInitiated.length
         }
       },
-      // ✅ NEW: QR Analytics
+      // NEW: QR Analytics
       qrAnalytics: includeQRMetrics === 'true' ? {
         totalQRTransactions: qrTransactions.length,
         customerScannedQR: customerScannedQR.length,
@@ -642,19 +642,19 @@ async function getTransactionAnalytics(req, res) {
       }
     };
 
-    console.log(`✅ Analytics completed: ${totalTransactions} total, ${qrTransactions.length} QR, ${successfulTransactions.length} successful`);
+    console.log(`Analytics completed: ${totalTransactions} total, ${qrTransactions.length} QR, ${successfulTransactions.length} successful`);
 
     res.status(200).json({
       status: 'success',
       analytics
     });
   } catch (error) {
-    console.error('💥 Analytics error:', error);
+    console.error('Analytics error:', error);
     res.status(500).json({ error: `Failed to get analytics: ${error.message}` });
   }
 }
 
-// ✅ ENHANCED: Get single transaction with QR metadata
+// ENHANCED: Get single transaction with QR metadata
 async function getTransactionById(req, res) {
   const { transactionId } = req.params;
   const merchantId = req.user.uid;
@@ -685,7 +685,7 @@ async function getTransactionById(req, res) {
         paymentType: transaction.paymentType || 'unknown',
         source: transaction.source || 'unknown'
       },
-      // ✅ Enhanced QR metadata for single transaction
+      // Enhanced QR metadata for single transaction
       qrMetadata: {
         hasQRData: !!transaction.qrData,
         qrSource: transaction.source === 'qr_scanner' ? 'customer_scanned' : 
@@ -710,7 +710,7 @@ async function getTransactionById(req, res) {
 // Get transaction by CheckoutRequestID (for callback updates) - Enhanced with QR logging
 async function getTransactionByCheckoutRequestID(checkoutRequestID) {
   try {
-    console.log(`🔍 Searching for transaction with CheckoutRequestID: ${checkoutRequestID}`);
+    console.log(`Searching for transaction with CheckoutRequestID: ${checkoutRequestID}`);
     
     // Strategy 1: Search in CheckoutRequestID field (new consistent format)
     let snapshot = await db.collection('transactions')
@@ -722,7 +722,7 @@ async function getTransactionByCheckoutRequestID(checkoutRequestID) {
       const doc = snapshot.docs[0];
       const data = doc.data();
       const qrInfo = data.qrData ? `QR:${data.qrData.type || 'unknown'}` : 'non-QR';
-      console.log(`✅ Found transaction via CheckoutRequestID field: ${doc.id} (${data.isValidMerchant ? 'real' : 'guest'} merchant, ${qrInfo})`);
+      console.log(`Found transaction via CheckoutRequestID field: ${doc.id} (${data.isValidMerchant ? 'real' : 'guest'} merchant, ${qrInfo})`);
       return {
         id: doc.id,
         ref: doc.ref,
@@ -740,7 +740,7 @@ async function getTransactionByCheckoutRequestID(checkoutRequestID) {
       const doc = snapshot.docs[0];
       const data = doc.data();
       const qrInfo = data.qrData ? `QR:${data.qrData.type || 'unknown'}` : 'non-QR';
-      console.log(`✅ Found transaction via mpesaResponse.CheckoutRequestID: ${doc.id} (${data.isValidMerchant ? 'real' : 'guest'} merchant, ${qrInfo})`);
+      console.log(`Found transaction via mpesaResponse.CheckoutRequestID: ${doc.id} (${data.isValidMerchant ? 'real' : 'guest'} merchant, ${qrInfo})`);
       return {
         id: doc.id,
         ref: doc.ref,
@@ -764,7 +764,7 @@ async function getTransactionByCheckoutRequestID(checkoutRequestID) {
         const doc = snapshot.docs[0];
         const data = doc.data();
         const qrInfo = data.qrData ? `QR:${data.qrData.type || 'unknown'}` : 'non-QR';
-        console.log(`✅ Found transaction via CheckoutRequestID variation: ${doc.id} (${data.isValidMerchant ? 'real' : 'guest'} merchant, ${qrInfo})`);
+        console.log(`Found transaction via CheckoutRequestID variation: ${doc.id} (${data.isValidMerchant ? 'real' : 'guest'} merchant, ${qrInfo})`);
         return {
           id: doc.id,
           ref: doc.ref,
@@ -773,20 +773,20 @@ async function getTransactionByCheckoutRequestID(checkoutRequestID) {
       }
     }
 
-    console.log(`❌ No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
+    console.log(`No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
     return null;
   } catch (error) {
-    console.error('💥 Error finding transaction by CheckoutRequestID:', error);
+    console.error('Error finding transaction by CheckoutRequestID:', error);
     return null;
   }
 }
 
-// ✅ ENHANCED: Debug endpoint with QR analytics
+// ENHANCED: Debug endpoint with QR analytics
 async function debugTransactions(req, res) {
   const merchantId = req.user.uid;
   
   try {
-    console.log(`🐛 Debug request for merchant: ${merchantId}`);
+    console.log(`Debug request for merchant: ${merchantId}`);
 
     const allTransactionsSnapshot = await db.collection('transactions').limit(100).get();
     const merchantTransactionsSnapshot = await db.collection('transactions')
@@ -802,7 +802,7 @@ async function debugTransactions(req, res) {
       serializeTransaction({ id: doc.id, ...doc.data() })
     );
 
-    // ✅ Enhanced field issues tracking with QR metrics
+    // Enhanced field issues tracking with QR metrics
     const fieldIssues = {
       missingMerchantId: allTransactions.filter(t => !t.merchantId && !t.guestMerchantInfo).length,
       missingCheckoutRequestID: allTransactions.filter(t => 
@@ -816,7 +816,7 @@ async function debugTransactions(req, res) {
       validMerchantTransactions: allTransactions.filter(t => t.isValidMerchant === true).length,
       guestTransactions: allTransactions.filter(t => t.isValidMerchant === false || t.guestMerchantInfo).length,
       nullMerchantId: allTransactions.filter(t => t.merchantId === null).length,
-      // ✅ NEW: QR-related issues
+      // NEW: QR-related issues
       qrTransactions: allTransactions.filter(t => !!t.qrData).length,
       qrWithoutMetadata: allTransactions.filter(t => !!t.qrData && !t.qrMetadata).length,
       incompleteQRData: allTransactions.filter(t => t.qrData && (!t.qrData.merchantId || !t.qrData.amount)).length
@@ -830,7 +830,7 @@ async function debugTransactions(req, res) {
       other: merchantTransactions.filter(t => !['success', 'pending', 'failed', 'error'].includes(t.status)).length
     };
 
-    // ✅ Enhanced payment type distribution with QR insights
+    // Enhanced payment type distribution with QR insights
     const paymentTypeDistribution = {
       customerToMerchant: allTransactions.filter(t => t.paymentType === 'customer_initiated').length,
       merchantInitiated: allTransactions.filter(t => t.paymentType === 'merchant_initiated').length,
@@ -839,7 +839,7 @@ async function debugTransactions(req, res) {
       unknown: allTransactions.filter(t => !t.paymentType).length
     };
 
-    // ✅ Enhanced recent transactions with QR info
+    // Enhanced recent transactions with QR info
     const recentTransactions = merchantTransactions
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 5)
@@ -855,7 +855,7 @@ async function debugTransactions(req, res) {
         isValidMerchant: tx.isValidMerchant,
         paymentType: tx.paymentType,
         source: tx.source,
-        // ✅ NEW: QR information
+        // NEW: QR information
         hasQRData: !!tx.qrData,
         qrType: tx.qrData?.type || null,
         businessName: tx.qrData?.businessName || tx.businessName || null
@@ -879,7 +879,7 @@ async function debugTransactions(req, res) {
           'Most transactions are guest transactions - consider promoting QR generation feature to merchants' :
           'Good merchant linking - most transactions are from registered merchants'
       },
-      // ✅ NEW: QR Diagnostics
+      // NEW: QR Diagnostics
       qrDiagnostics: {
         totalQRTransactions: fieldIssues.qrTransactions,
         qrAdoptionRate: allTransactions.length > 0 
@@ -901,7 +901,7 @@ async function debugTransactions(req, res) {
       }
     };
 
-    console.log(`✅ Enhanced debug completed: ${merchantTransactions.length} merchant transactions, ${fieldIssues.qrTransactions} QR transactions`);
+    console.log(`Enhanced debug completed: ${merchantTransactions.length} merchant transactions, ${fieldIssues.qrTransactions} QR transactions`);
 
     res.status(200).json({
       status: 'success',
@@ -909,7 +909,7 @@ async function debugTransactions(req, res) {
     });
 
   } catch (error) {
-    console.error('💥 Debug error:', error);
+    console.error('Debug error:', error);
     res.status(500).json({ 
       error: `Debug failed: ${error.message}`,
       merchantId 
@@ -917,7 +917,7 @@ async function debugTransactions(req, res) {
   }
 }
 
-// ✅ ENHANCED: Get all transactions for a merchant with QR insights
+// ENHANCED: Get all transactions for a merchant with QR insights
 async function getMerchantAllTransactions(req, res) {
   const merchantId = req.user.uid;
   const { 
@@ -930,7 +930,7 @@ async function getMerchantAllTransactions(req, res) {
   } = req.query;
 
   try {
-    console.log(`🔍 getMerchantAllTransactions - merchant: ${merchantId}, includeQRMetrics: ${includeQRMetrics}`);
+    console.log(`getMerchantAllTransactions - merchant: ${merchantId}, includeQRMetrics: ${includeQRMetrics}`);
 
     // Calculate date range for filtering
     const now = new Date();
@@ -1000,9 +1000,9 @@ async function getMerchantAllTransactions(req, res) {
       )
     ];
 
-    console.log(`📊 Found ${realTransactions.docs.length} real + ${guestTransactions.docs.length} guest = ${allTransactionDocs.length} total transactions`);
+    console.log(`Found ${realTransactions.docs.length} real + ${guestTransactions.docs.length} guest = ${allTransactionDocs.length} total transactions`);
 
-    // ✅ ENHANCED: Map and serialize transactions with QR metadata
+    //  ENHANCED: Map and serialize transactions with QR metadata
     let transactions = allTransactionDocs.map(doc => {
       const data = doc.data();
       return serializeTransaction({
@@ -1032,7 +1032,7 @@ async function getMerchantAllTransactions(req, res) {
     // Sort by creation date (newest first)
     transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    // ✅ ENHANCED: Calculate summary statistics with QR insights
+    // ENHANCED: Calculate summary statistics with QR insights
     const qrTransactions = transactions.filter(t => t.qrMetadata?.hasQRData);
     const summary = {
       total: transactions.length,
@@ -1044,7 +1044,7 @@ async function getMerchantAllTransactions(req, res) {
         .reduce((sum, t) => sum + (t.amount || 0), 0),
       realMerchantTransactions: transactions.filter(t => t.merchantValidation?.isValid === true).length,
       guestTransactions: transactions.filter(t => t.merchantValidation?.isValid === false).length,
-      // ✅ NEW: QR metrics
+      // NEW: QR metrics
       qrMetrics: includeQRMetrics === 'true' ? {
         totalQRTransactions: qrTransactions.length,
         qrRevenue: qrTransactions.filter(t => t.status === 'success').reduce((sum, t) => sum + (t.amount || 0), 0),
@@ -1056,7 +1056,7 @@ async function getMerchantAllTransactions(req, res) {
       } : undefined
     };
 
-    console.log(`✅ Returning ${transactions.length} transactions (${qrTransactions.length} QR) for merchant ${merchantId}`);
+    console.log(`Returning ${transactions.length} transactions (${qrTransactions.length} QR) for merchant ${merchantId}`);
 
     res.status(200).json({
       status: 'success',
@@ -1074,7 +1074,7 @@ async function getMerchantAllTransactions(req, res) {
     });
 
   } catch (error) {
-    console.error('💥 getMerchantAllTransactions error:', error);
+    console.error('getMerchantAllTransactions error:', error);
     res.status(500).json({ 
       error: `Failed to get merchant transactions: ${error.message}`,
       merchantId 
@@ -1082,7 +1082,7 @@ async function getMerchantAllTransactions(req, res) {
   }
 }
 
-// ✅ ENHANCED: Update transaction status with QR logging
+// ENHANCED: Update transaction status with QR logging
 async function updateTransactionStatus(req, res) {
   const { transactionId } = req.params;
   const { status, reason } = req.body;
@@ -1124,14 +1124,14 @@ async function updateTransactionStatus(req, res) {
         reason: reason || 'Manual update by merchant',
         updatedBy: merchantId,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        wasQRTransaction: !!transaction.qrData // ✅ Track if this was a QR transaction
+        wasQRTransaction: !!transaction.qrData // Track if this was a QR transaction
       }
     };
 
     await transactionRef.update(updateData);
 
     const qrInfo = transaction.qrData ? ` (QR: ${transaction.qrData.type || 'unknown'})` : '';
-    console.log(`✅ Transaction ${transactionId} status updated to ${status} by merchant ${merchantId}${qrInfo}`);
+    console.log(`Transaction ${transactionId} status updated to ${status} by merchant ${merchantId}${qrInfo}`);
 
     // Return updated transaction
     const updatedDoc = await transactionRef.get();
@@ -1158,14 +1158,14 @@ async function updateTransactionStatus(req, res) {
     });
 
   } catch (error) {
-    console.error('💥 Update transaction status error:', error);
+    console.error('Update transaction status error:', error);
     res.status(500).json({ 
       error: `Failed to update transaction: ${error.message}` 
     });
   }
 }
 
-// ✅ NEW: Get QR-specific transaction insights
+// NEW: Get QR-specific transaction insights
 async function getQRTransactionInsights(req, res) {
   const merchantId = req.user.uid;
   const { period = 'week', detailed = false } = req.query;
@@ -1280,7 +1280,7 @@ async function getQRTransactionInsights(req, res) {
     });
 
   } catch (error) {
-    console.error('💥 QR Insights error:', error);
+    console.error('QR Insights error:', error);
     res.status(500).json({ error: `Failed to get QR insights: ${error.message}` });
   }
 }
@@ -1294,5 +1294,5 @@ module.exports = {
   debugTransactions,
   getMerchantAllTransactions,
   updateTransactionStatus,
-  getQRTransactionInsights // ✅ NEW: QR-specific insights endpoint
+  getQRTransactionInsights // NEW: QR-specific insights endpoint
 };

@@ -134,7 +134,7 @@ async function testRegister(req, res) {
     });
     
   } catch (error) {
-    console.error('💥 Test registration failed:', error);
+    console.error('Test registration failed:', error);
     res.status(500).json({
       success: false,
       message: 'Test registration failed',
@@ -143,9 +143,9 @@ async function testRegister(req, res) {
   }
 }
 
-// ✅ ENHANCED: Customer payment function with dynamic amount support
+// ENHANCED: Customer payment function with dynamic amount support
 async function triggerCustomerPayment(req, res) {
-  console.log('💰 Customer payment initiated');
+  console.log('Customer payment initiated');
   const { phoneNumber, amount, qrData } = req.body;
   
   // Validate required fields
@@ -173,7 +173,7 @@ async function triggerCustomerPayment(req, res) {
       formattedPhone = '254' + formattedPhone;
     }
 
-    console.log('📞 Formatted phone number:', formattedPhone);
+    console.log('Formatted phone number:', formattedPhone);
 
     // Validate phone number format
     if (!/^254\d{9}$/.test(formattedPhone)) {
@@ -222,7 +222,7 @@ async function triggerCustomerPayment(req, res) {
     // Extract data from qrData
     const { merchantId, businessName, businessShortCode } = qrData;
 
-    // ✅ CRITICAL FIX: Validate merchant exists in database
+    // CRITICAL FIX: Validate merchant exists in database
     let isValidMerchant = false;
     let merchantData = null;
     
@@ -232,7 +232,7 @@ async function triggerCustomerPayment(req, res) {
         if (merchantDoc.exists) {
           isValidMerchant = true;
           merchantData = merchantDoc.data();
-          console.log(`✅ Found valid merchant: ${merchantData.name} (${merchantId})`);
+          console.log(`Found valid merchant: ${merchantData.name} (${merchantId})`);
         } else {
           // Check in users collection as fallback
           const userDoc = await admin.auth().getUser(merchantId);
@@ -243,16 +243,16 @@ async function triggerCustomerPayment(req, res) {
               email: userDoc.email,
               uid: userDoc.uid
             };
-            console.log(`✅ Found valid user as merchant: ${merchantData.name} (${merchantId})`);
+            console.log(`Found valid user as merchant: ${merchantData.name} (${merchantId})`);
           } else {
-            console.log(`⚠️ Merchant not found: ${merchantId}, treating as guest transaction`);
+            console.log(`Merchant not found: ${merchantId}, treating as guest transaction`);
           }
         }
       } catch (error) {
-        console.log(`⚠️ Error checking merchant: ${error.message}, treating as guest transaction`);
+        console.log(`Error checking merchant: ${error.message}, treating as guest transaction`);
       }
     } else {
-      console.log(`⚠️ Guest/manual transaction - merchantId: ${merchantId}`);
+      console.log(`Guest/manual transaction - merchantId: ${merchantId}`);
     }
 
     const stkPushData = {
@@ -269,7 +269,7 @@ async function triggerCustomerPayment(req, res) {
       TransactionDesc: `Payment to ${businessName || 'Merchant'}`
     };
 
-    console.log('📤 STK Push request data:', stkPushData);
+    console.log('STK Push request data:', stkPushData);
 
     // Send STK push request
     const response = await axios.post(
@@ -283,13 +283,13 @@ async function triggerCustomerPayment(req, res) {
       }
     );
 
-    console.log('📥 M-Pesa STK response:', response.data);
+    console.log('M-Pesa STK response:', response.data);
 
     if (response.data.ResponseCode === "0") {
-      // ✅ ENHANCED: Create transaction record with proper merchant linking
+      //  ENHANCED: Create transaction record with proper merchant linking
       const transactionData = {
         // Core transaction data
-        merchantId: isValidMerchant ? merchantId : null, // ✅ Only set if valid merchant
+        merchantId: isValidMerchant ? merchantId : null, // Only set if valid merchant
         amount: parsedAmount,
         phoneNumber: formattedPhone,
         status: 'pending',
@@ -312,13 +312,13 @@ async function triggerCustomerPayment(req, res) {
         // M-Pesa response
         mpesaResponse: response.data,
         
-        // ✅ CRITICAL: Enhanced metadata for proper categorization
+        // CRITICAL: Enhanced metadata for proper categorization
         paymentType: 'customer_initiated',
         source: 'qr_scanner',
-        isValidMerchant: isValidMerchant, // ✅ Mark if this is a real merchant
-        isDynamicAmount: qrData.dynamicAmount || false, // ✅ Track if this was a dynamic amount transaction
+        isValidMerchant: isValidMerchant, //  Mark if this is a real merchant
+        isDynamicAmount: qrData.dynamicAmount || false, //  Track if this was a dynamic amount transaction
         
-        // ✅ NEW: Guest merchant tracking for dashboard queries
+        // NEW: Guest merchant tracking for dashboard queries
         ...(isValidMerchant ? {} : {
           guestMerchantInfo: {
             originalMerchantId: merchantId,
@@ -329,7 +329,7 @@ async function triggerCustomerPayment(req, res) {
           }
         }),
         
-        // ✅ NEW: Enhanced merchant info for valid merchants
+        // NEW: Enhanced merchant info for valid merchants
         ...(isValidMerchant && merchantData ? {
           merchantInfo: {
             name: merchantData.name,
@@ -347,8 +347,8 @@ async function triggerCustomerPayment(req, res) {
 
       const transactionRef = await db.collection('transactions').add(transactionData);
       
-      console.log(`✅ ENHANCED: Customer transaction ${transactionRef.id} created`);
-      console.log('🔍 Merchant linking:', {
+      console.log(`ENHANCED: Customer transaction ${transactionRef.id} created`);
+      console.log('Merchant linking:', {
         merchantId,
         isValidMerchant,
         businessName,
@@ -367,7 +367,7 @@ async function triggerCustomerPayment(req, res) {
           ResponseDescription: response.data.ResponseDescription,
           transactionId: transactionRef.id,
           transactionRef: transactionData.transactionRef,
-          // ✅ NEW: Include merchant validation info for frontend
+          // NEW: Include merchant validation info for frontend
           merchantValidation: {
             isValidMerchant,
             merchantId: isValidMerchant ? merchantId : null,
@@ -377,7 +377,7 @@ async function triggerCustomerPayment(req, res) {
       });
     } else {
       // Handle M-Pesa API errors
-      console.error('💥 M-Pesa API error:', response.data);
+      console.error('M-Pesa API error:', response.data);
       
       // Still store failed transaction for tracking
       const failedTransactionData = {
@@ -405,17 +405,17 @@ async function triggerCustomerPayment(req, res) {
       };
       
       await db.collection('transactions').add(failedTransactionData);
-      console.log('⚠️ Failed transaction stored');
+      console.log('Failed transaction stored');
       
       throw new Error(`M-Pesa API error: ${response.data.ResponseDescription}`);
     }
 
   } catch (error) {
-    console.error('💥 Customer payment error:', error);
+    console.error('Customer payment error:', error);
     
     let errorMessage = 'Failed to initiate payment';
     if (error.response) {
-      console.error('📥 M-Pesa API error response:', error.response.data);
+      console.error('M-Pesa API error response:', error.response.data);
       errorMessage = error.response.data.errorMessage || error.response.data.ResponseDescription || errorMessage;
     } else if (error.message) {
       errorMessage = error.message;
@@ -429,11 +429,11 @@ async function triggerCustomerPayment(req, res) {
   }
 }
 
-// ✅ ENHANCED: Callback handler with better transaction linking and status updates
+// ENHANCED: Callback handler with better transaction linking and status updates
 async function handleCallback(req, res) {
   try {
     const callbackData = req.body;
-    console.log('📞 M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
+    console.log('M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
 
     if (callbackData.Body && callbackData.Body.stkCallback) {
       const stkCallback = callbackData.Body.stkCallback;
@@ -450,7 +450,7 @@ async function handleCallback(req, res) {
         status = 'failed';
       }
 
-      console.log(`📊 Processing callback for CheckoutRequestID: ${checkoutRequestID}, ResultCode: ${resultCode}, Status: ${status}`);
+      console.log(`Processing callback for CheckoutRequestID: ${checkoutRequestID}, ResultCode: ${resultCode}, Status: ${status}`);
 
       // Extract callback metadata
       const callbackMetadata = {};
@@ -460,14 +460,14 @@ async function handleCallback(req, res) {
         });
       }
 
-      console.log('📋 Callback metadata:', callbackMetadata);
+      console.log('Callback metadata:', callbackMetadata);
 
       // Find the transaction using enhanced search
       const transactionDoc = await getTransactionByCheckoutRequestID(checkoutRequestID);
 
       if (transactionDoc) {
-        console.log(`✅ Found transaction ${transactionDoc.id} for callback update`);
-        console.log(`🏪 Transaction belongs to merchant: ${transactionDoc.data.merchantId || 'Guest'}`);
+        console.log(`Found transaction ${transactionDoc.id} for callback update`);
+        console.log(`Transaction belongs to merchant: ${transactionDoc.data.merchantId || 'Guest'}`);
         
         const updateData = {
           status,
@@ -477,7 +477,7 @@ async function handleCallback(req, res) {
           callbackData: stkCallback,
           callbackMetadata,
           callbackReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
-          // ✅ NEW: Enhanced callback processing
+          // NEW: Enhanced callback processing
           callbackProcessed: true,
           lastCallbackAt: admin.firestore.FieldValue.serverTimestamp()
         };
@@ -497,7 +497,7 @@ async function handleCallback(req, res) {
 
         // Update the transaction
         await transactionDoc.ref.update(updateData);
-        console.log(`✅ Transaction ${transactionDoc.id} updated with status: ${status}`);
+        console.log(`Transaction ${transactionDoc.id} updated with status: ${status}`);
         
         // Log result with merchant info
         const merchantInfo = transactionDoc.data.merchantId ? 
@@ -505,13 +505,13 @@ async function handleCallback(req, res) {
           `for guest merchant ${transactionDoc.data.guestMerchantInfo?.businessName || 'Unknown'}`;
         
         if (status === 'success') {
-          console.log(`💰 Payment successful: KSH ${callbackMetadata.Amount} from ${callbackMetadata.PhoneNumber} ${merchantInfo}`);
+          console.log(`Payment successful: KSH ${callbackMetadata.Amount} from ${callbackMetadata.PhoneNumber} ${merchantInfo}`);
         } else {
-          console.log(`❌ Payment ${status}: ${resultDesc} ${merchantInfo}`);
+          console.log(`Payment ${status}: ${resultDesc} ${merchantInfo}`);
         }
       } else {
-        console.log(`❌ No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
-        // ✅ ENHANCED: Store orphaned callbacks for debugging
+        console.log(`No transaction found for CheckoutRequestID: ${checkoutRequestID}`);
+        // ENHANCED: Store orphaned callbacks for debugging
         await db.collection('orphaned_callbacks').add({
           checkoutRequestID,
           callbackData,
@@ -528,7 +528,7 @@ async function handleCallback(req, res) {
     });
 
   } catch (error) {
-    console.error('💥 Callback processing error:', error);
+    console.error('Callback processing error:', error);
     res.status(500).json({ error: 'Failed to process callback' });
   }
 }
@@ -538,7 +538,7 @@ async function triggerSTKPush(req, res) {
   const { phoneNumber, amount, reference, description } = req.body;
   const merchantId = req.user.uid; // From auth middleware
   
-  console.log('🏪 Merchant STK Push request:', { 
+  console.log('Merchant STK Push request:', { 
     phoneNumber, 
     amount, 
     reference, 
@@ -547,26 +547,26 @@ async function triggerSTKPush(req, res) {
   });
 
   if (!phoneNumber || !amount) {
-    console.error('❌ Phone number and amount are required');
+    console.error('Phone number and amount are required');
     return res.status(400).json({ error: 'Phone number and amount are required' });
   }
 
   // Validate phone number format
   if (!/^254\d{9}$/.test(phoneNumber)) {
-    console.error('❌ Invalid phone number format:', phoneNumber);
+    console.error('Invalid phone number format:', phoneNumber);
     return res.status(400).json({ error: 'Phone number must be in format 254XXXXXXXXX (12 digits)' });
   }
 
   // Sandbox only works with test number 254708374149
   if (process.env.NODE_ENV !== 'production' && phoneNumber !== '254708374149') {
-    console.error('⚠️ Sandbox only works with test number 254708374149');
+    console.error('Sandbox only works with test number 254708374149');
     return res.status(400).json({ error: 'Sandbox only works with test number 254708374149' });
   }
 
   // Validate amount
   const parsedAmount = parseFloat(amount);
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
-    console.error('❌ Invalid amount:', amount);
+    console.error('Invalid amount:', amount);
     return res.status(400).json({ error: 'Amount must be a positive number' });
   }
 
@@ -578,7 +578,7 @@ async function triggerSTKPush(req, res) {
     }
 
     const merchantData = merchantDoc.data();
-    console.log('✅ Merchant found:', merchantData.name);
+    console.log('Merchant found:', merchantData.name);
 
     const accessToken = await generateAccessToken();
     const now = new Date();
@@ -609,7 +609,7 @@ async function triggerSTKPush(req, res) {
       TransactionDesc: description || 'QR Payment',
     };
 
-    console.log('📤 STK Push Payload:', JSON.stringify(payload, null, 2));
+    console.log('STK Push Payload:', JSON.stringify(payload, null, 2));
 
     const response = await axios.post(
       `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
@@ -622,7 +622,7 @@ async function triggerSTKPush(req, res) {
       }
     );
 
-    console.log('📥 STK Push Response:', JSON.stringify(response.data, null, 2));
+    console.log('STK Push Response:', JSON.stringify(response.data, null, 2));
 
     // Enhanced transaction storage with consistent field naming
     const transactionData = {
@@ -663,13 +663,13 @@ async function triggerSTKPush(req, res) {
 
     const docRef = await db.collection('transactions').add(transactionData);
 
-    console.log(`✅ Transaction ${docRef.id} created successfully`);
-    console.log('🔍 Stored CheckoutRequestID:', response.data.CheckoutRequestID);
-    console.log('🔍 Stored merchantId:', merchantId);
+    console.log(`Transaction ${docRef.id} created successfully`);
+    console.log('Stored CheckoutRequestID:', response.data.CheckoutRequestID);
+    console.log('Stored merchantId:', merchantId);
 
     // Check for error in response
     if (response.data.errorCode || response.data.errorMessage) {
-      console.error('💥 STK Push API error:', response.data);
+      console.error('STK Push API error:', response.data);
       
       // Update transaction with error status
       await docRef.update({
@@ -693,24 +693,24 @@ async function triggerSTKPush(req, res) {
     });
 
   } catch (error) {
-    console.error('💥 STK Push error:', error);
+    console.error('STK Push error:', error);
     
     if (error.response) {
-      console.error('📥 Response status:', error.response.status);
-      console.error('📥 Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
       return res.status(500).json({
         error: error.response.data.errorMessage || error.response.data.error || 'Failed to initiate STK push',
         details: error.response.data,
         status: error.response.status,
       });
     } else if (error.request) {
-      console.error('📤 No response received:', error.request);
+      console.error('No response received:', error.request);
       return res.status(500).json({
         error: 'No response received from M-Pesa API',
         details: error.message,
       });
     } else {
-      console.error('⚙️ Error setting up request:', error.message);
+      console.error('Error setting up request:', error.message);
       return res.status(500).json({
         error: error.message || 'Failed to initiate STK push'
       });
@@ -729,7 +729,7 @@ async function createTestTransaction(req, res) {
       });
     }
 
-    console.log('🧪 Creating test transaction...');
+    console.log('Creating test transaction...');
     
     const testTransactionData = {
       merchantId: merchantId,
@@ -755,7 +755,7 @@ async function createTestTransaction(req, res) {
     };
     
     const docRef = await db.collection('transactions').add(testTransactionData);
-    console.log('✅ Test transaction created:', docRef.id);
+    console.log('Test transaction created:', docRef.id);
     
     res.status(201).json({
       success: true,
@@ -765,7 +765,7 @@ async function createTestTransaction(req, res) {
     });
     
   } catch (error) {
-    console.error('💥 Test transaction creation failed:', error);
+    console.error('Test transaction creation failed:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -773,7 +773,7 @@ async function createTestTransaction(req, res) {
   }
 }
 
-// ✅ UPDATED: Generate QR code for merchant with support for dynamic amounts
+// UPDATED: Generate QR code for merchant with support for dynamic amounts
 async function generateMerchantQR(req, res) {
   try {
     const merchantId = req.user.uid;
@@ -810,7 +810,7 @@ async function generateMerchantQR(req, res) {
       dynamicAmount: dynamicAmount // New field indicating customer should enter amount
     };
 
-    console.log('✅ Dynamic QR Code generated for merchant:', merchantId);
+    console.log('Dynamic QR Code generated for merchant:', merchantId);
 
     res.status(200).json({
   success: true,
@@ -824,7 +824,7 @@ async function generateMerchantQR(req, res) {
 });
 
   } catch (error) {
-    console.error('💥 QR generation error:', error);
+    console.error('QR generation error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate QR code',
@@ -852,11 +852,11 @@ module.exports = {
 };
 
 // Log successful module load
-console.log('✅ daraja.js module loaded successfully with all fixes applied');
-console.log('🔧 Fixed issues:');
-console.log('   - Enhanced customer payment merchant linking');
-console.log('   - Added support for dynamic amount QR codes');
-console.log('   - Improved callback transaction lookup and updates');
-console.log('   - Better transaction categorization and metadata');
-console.log('   - Comprehensive merchant validation');
-console.log('   - Enhanced error handling and logging');
+console.log('daraja.js module loaded successfully with all fixes applied');
+console.log('Fixed issues:');
+console.log('Enhanced customer payment merchant linking');
+console.log('Added support for dynamic amount QR codes');
+console.log('Improved callback transaction lookup and updates');
+console.log('Better transaction categorization and metadata');
+console.log('Comprehensive merchant validation');
+console.log('Enhanced error handling and logging');
