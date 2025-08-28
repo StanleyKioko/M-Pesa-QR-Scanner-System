@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
@@ -35,15 +36,12 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../utility/constants';
+import { useAuth } from '../hooks/useAuth';
 
-const MerchantDashboard = ({ 
-  user, 
-  token, 
-  onLogout, 
-  onNavigateToLanding, 
-  onNavigateToScanner, 
-  onNavigateToQRGenerator
-}) => {
+const MerchantDashboard = () => {
+  const { user, merchantData, logout } = useAuth();
+  const navigate = useNavigate();
+  
   const [analytics, setAnalytics] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -119,6 +117,7 @@ const MerchantDashboard = ({
   };
 
   const fetchAnalytics = async () => {
+    const token = localStorage.getItem('authToken');
     if (!token) return;
     
     setLoading(true);
@@ -156,6 +155,7 @@ const MerchantDashboard = ({
   };
 
   const fetchDebugInfo = async () => {
+    const token = localStorage.getItem('authToken');
     if (!token) return;
     
     try {
@@ -186,19 +186,28 @@ const MerchantDashboard = ({
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
-      onLogout();
+      logout();
+      navigate('/login');
     }
+  };
+  
+  const handleNavigateToQRGenerator = () => {
+    navigate('/generate-qr');
+  };
+  
+  const handleNavigateToScanner = () => {
+    navigate('/payment-scanner');
   };
 
   useEffect(() => {
     fetchAnalytics();
-  }, [period, status, token]);
+  }, [period, status]);
 
   useEffect(() => {
     if (showDebug && !debugData) {
       fetchDebugInfo();
     }
-  }, [showDebug, token]);
+  }, [showDebug]);
 
   // Calculate stats
   const stats = analytics ? {
@@ -229,7 +238,7 @@ const MerchantDashboard = ({
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Merchant Dashboard</h1>
-                <p className="text-gray-600">Welcome back, {user?.name || 'Merchant'}</p>
+                <p className="text-gray-600">Welcome back, {merchantData?.name || user?.displayName || 'Merchant'}</p>
               </div>
             </div>
             
@@ -261,48 +270,30 @@ const MerchantDashboard = ({
                 {showNavMenu && (
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-50 border">
                     {/* QR Generator Option */}
-                    {onNavigateToQRGenerator && (
-                      <button
-                        onClick={() => {
-                          setShowNavMenu(false);
-                          onNavigateToQRGenerator();
-                        }}
-                        className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
-                      >
-                        <QrCode className="w-4 h-4" />
-                        Generate QR Code
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        setShowNavMenu(false);
+                        handleNavigateToQRGenerator();
+                      }}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      Generate QR Code
+                    </button>
 
                     {/* QR Scanner Option */}
-                    {onNavigateToScanner && (
-                      <button
-                        onClick={() => {
-                          setShowNavMenu(false);
-                          onNavigateToScanner();
-                        }}
-                        className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                        QR Scanner
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        setShowNavMenu(false);
+                        handleNavigateToScanner();
+                      }}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      QR Scanner
+                    </button>
                     
                     <hr className="my-2" />
-                    
-                    {/* Landing Page Option */}
-                    {onNavigateToLanding && (
-                      <button
-                        onClick={() => {
-                          setShowNavMenu(false);
-                          onNavigateToLanding();
-                        }}
-                        className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
-                      >
-                        <Home className="w-4 h-4" />
-                        Back to Landing
-                      </button>
-                    )}
                     
                     {/* Logout Option */}
                     <button
@@ -648,42 +639,38 @@ const MerchantDashboard = ({
           <TabsContent value="actions">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Generate QR Code */}
-              {onNavigateToQRGenerator && (
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onNavigateToQRGenerator}>
-                  <CardContent className="p-6 text-center">
-                    <div className="bg-green-100 p-4 rounded-full w-fit mx-auto mb-4">
-                      <QrCode className="w-8 h-8 text-green-600" />
-                    </div>
-                    <h3 className="font-semibold text-lg mb-2">Generate QR Code</h3>
-                    <p className="text-gray-600 text-sm mb-4">
-                      Create payment QR codes for your customers
-                    </p>
-                    <Button className="w-full bg-green-600 hover:bg-green-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create QR Code
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleNavigateToQRGenerator}>
+                <CardContent className="p-6 text-center">
+                  <div className="bg-green-100 p-4 rounded-full w-fit mx-auto mb-4">
+                    <QrCode className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">Generate QR Code</h3>
+                  <p className="text-gray-600 text-sm mb-4">
+                    Create payment QR codes for your customers
+                  </p>
+                  <Button className="w-full bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create QR Code
+                  </Button>
+                </CardContent>
+              </Card>
 
               {/* QR Scanner */}
-              {onNavigateToScanner && (
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={onNavigateToScanner}>
-                  <CardContent className="p-6 text-center">
-                    <div className="bg-blue-100 p-4 rounded-full w-fit mx-auto mb-4">
-                      <Smartphone className="w-8 h-8 text-blue-600" />
-                    </div>
-                    <h3 className="font-semibold text-lg mb-2">QR Scanner</h3>
-                    <p className="text-gray-600 text-sm mb-4">
-                      Scan QR codes to process customer payments
-                    </p>
-                    <Button className="w-full" variant="outline">
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Open Scanner
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleNavigateToScanner}>
+                <CardContent className="p-6 text-center">
+                  <div className="bg-blue-100 p-4 rounded-full w-fit mx-auto mb-4">
+                    <Smartphone className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">QR Scanner</h3>
+                  <p className="text-gray-600 text-sm mb-4">
+                    Scan QR codes to process customer payments
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    <QrCode className="w-4 h-4 mr-2" />
+                    Open Scanner
+                  </Button>
+                </CardContent>
+              </Card>
 
               {/* Export Data */}
               <Card className="hover:shadow-lg transition-shadow">

@@ -1,185 +1,174 @@
 import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
+import { useNavigate } from 'react-router-dom';
 import Button from './ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
 import Input from './ui/Input';
 import Label from './ui/Label';
-import { User, Building, AlertCircle, CheckCircle, QrCode, Camera } from 'lucide-react';
+import { 
+  Mail, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  AlertCircle,
+  QrCode,
+  Store,
+  Building,
+  TrendingUp,
+  Shield
+} from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 import { API_BASE_URL } from '../utility/constants';
 import axios from 'axios';
+import { useAuth } from '../hooks/useAuth';
 
-const Login = ({ onLogin, onNavigateToRegister, onNavigateToScanner }) => {
+const Login = ({ onNavigateToRegister }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const { setMerchantData } = useAuth();
+  const navigate = useNavigate();
 
-  const handleLogin = async (role) => {
-    if (role === 'customer') {
-      onLogin(role, null);
-      return;
-    }
-
+  const handleMerchantLogin = async (e) => {
+    e.preventDefault();
+    
     if (!email || !password) {
-      setError('Please enter email and password');
+      setError('Please enter both email and password');
       return;
     }
 
     setLoading(true);
     setError('');
-    setSuccess('');
 
     try {
+      console.log('🔐 Starting Firebase authentication...');
+      
+      // Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      const token = await user.getIdToken();
+      
+      console.log('✅ Firebase auth successful, getting token...');
+      
+      // Get Firebase ID token
+      const idToken = await user.getIdToken();
+      
+      console.log('📞 Verifying with backend...', `${API_BASE_URL}/api/auth/verify-token`);
+      
+      // Verify with backend and get user data
+      const response = await axios.post(`${API_BASE_URL}/api/auth/verify-token`, {
+        idToken: idToken
+      }, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 second timeout
+      });
 
-      try {
-        const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
-          uid: user.uid,
-          email: user.email
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          timeout: 10000
-        });
+      console.log('📥 Backend response:', response.data);
 
-        const merchantData = {
-          token,
-          user: {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || response.data.user?.name || email,
-            ...response.data.user
-          }
+      if (response.data.success) {
+        const userData = {
+          user: response.data.user,
+          token: idToken
         };
-
-        setEmail('');
-        setPassword('');
         
-        onLogin(role, merchantData);
+        console.log('✅ Login successful, redirecting to dashboard...');
         
-      } catch (backendError) {
-        if (backendError.response?.status === 404) {
-          setError('Merchant profile not found. Please contact support or register a new account.');
-        } else if (backendError.code === 'ECONNREFUSED' || backendError.code === 'NETWORK_ERROR') {
-          setError('Cannot connect to server. Please ensure the backend server is running.');
-        } else {
-          setError(`Login failed: ${backendError.response?.data?.error || backendError.message}`);
-        }
+        // Store user data in auth context
+        setMerchantData(response.data.user);
+        
+        // Save token to localStorage for API calls
+        localStorage.setItem('authToken', idToken);
+        
+        // Navigate to dashboard
+        navigate('/dashboard');
+      } else {
+        throw new Error(response.data.error || 'Login failed');
+      }
+    } catch (err) {
+      console.error('❌ Login error:', err);
+      
+      let errorMessage = 'Login failed. Please try again.';
+      
+      // Handle different error types
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address.';
+      } else if (err.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled.';
+      } else if (err.code === 'ECONNREFUSED') {
+        errorMessage = 'Backend server is not running. Please contact support.';
+      } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (err.response?.status === 404) {
+        errorMessage = 'Backend service unavailable. Please try again later.';
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message && !err.code) {
+        errorMessage = err.message;
       }
       
-    } catch (firebaseError) {
-      switch (firebaseError.code) {
-        case 'auth/user-not-found':
-          setError('No account found with this email. Please register first.');
-          break;
-        case 'auth/wrong-password':
-          setError('Incorrect password. Please try again.');
-          break;
-        case 'auth/invalid-email':
-          setError('Invalid email address format.');
-          break;
-        case 'auth/user-disabled':
-          setError('This account has been disabled.');
-          break;
-        case 'auth/too-many-requests':
-          setError('Too many failed login attempts. Please try again later.');
-          break;
-        case 'auth/network-request-failed':
-          setError('Network error. Please check your internet connection.');
-          break;
-        default:
-          setError(`Login failed: ${firebaseError.message}`);
-      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <QrCode className="w-8 h-8 text-blue-600" />
-            </div>
-            <CardTitle>M-Pesa QR Scanner</CardTitle>
-            <CardDescription>
-              Scan QR codes to make instant payments
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-                <span className="text-sm text-red-700">{error}</span>
-              </div>
-            )}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-full w-fit mx-auto shadow-lg">
+            <QrCode className="w-10 h-10 text-white" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">M-Pesa QR Pay</h1>
+            <p className="text-xl text-gray-600">Merchant Portal</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Manage your business payments and QR codes
+            </p>
+          </div>
+        </div>
 
-            {success && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md flex items-start">
-                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
-                <span className="text-sm text-green-700">{success}</span>
+        {/* Merchant Login Card */}
+        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="space-y-3 pb-6">
+            <div className="flex items-center justify-center gap-3">
+              <div className="bg-blue-100 p-3 rounded-xl">
+                <Store className="w-6 h-6 text-blue-600" />
               </div>
-            )}
-
-            {/* Customer Section - Primary Focus */}
-            <div className="mb-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Camera className="w-6 h-6 text-green-600" />
-                  <div>
-                    <h3 className="font-semibold text-green-800">Ready to Pay?</h3>
-                    <p className="text-sm text-green-700">
-                      Scan merchant QR codes and pay instantly with M-Pesa
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Button
-                    onClick={() => handleLogin('customer')}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center py-3 bg-green-600 hover:bg-green-700"
-                  >
-                    <Camera className="w-5 h-5 mr-2" />
-                    Start Scanning & Paying
-                  </Button>
-                  
-                  <p className="text-xs text-green-600 text-center">
-                    No registration required • Scan • Pay • Done
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative mb-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-gray-100 px-3 text-gray-500 font-medium">
-                  For Business Owners
-                </span>
-              </div>
-            </div>
-
-            {/* Merchant Section - Secondary */}
-            <div className="space-y-4">
               <div className="text-center">
-                <p className="text-sm text-gray-600 mb-3">
-                  Generate QR codes and manage payments
-                </p>
+                <CardTitle className="text-2xl text-gray-900">Merchant Login</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Access your business dashboard
+                </CardDescription>
               </div>
-              
-              <div>
-                <Label htmlFor="email">Business Email</Label>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleMerchantLogin} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-gray-700 font-medium">
+                  Email Address
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -187,44 +176,90 @@ const Login = ({ onLogin, onNavigateToRegister, onNavigateToScanner }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500 h-12"
+                  icon={Mail}
                 />
               </div>
 
-              <Button
-                onClick={() => handleLogin('merchant')}
-                disabled={loading || !email || !password}
-                className="w-full flex items-center justify-center py-3"
-                variant="outline"
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-gray-700 font-medium">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    className="rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500 h-12 pr-12"
+                    icon={Lock}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl font-semibold text-white shadow-lg transition-all duration-200"
               >
-                <Building className="w-5 h-5 mr-2" />
-                {loading ? 'Signing In...' : 'Login as Merchant'}
+                {loading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  <span>Sign In to Dashboard</span>
+                )}
               </Button>
-
-              <div className="text-center">
-                <Button
-                  variant="link"
-                  onClick={onNavigateToRegister}
-                  disabled={loading}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Don't have a merchant account? Register here
-                </Button>
+              
+              {/* Registration Link */}
+              <div className="text-center mt-4">
+                <p className="text-gray-600 text-sm">
+                  Don't have an account yet?{' '}
+                  <button
+                    type="button"
+                    onClick={onNavigateToRegister}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Register your business
+                  </button>
+                </p>
               </div>
-            </div>
+            </form>
           </CardContent>
         </Card>
+        
+        {/* Features Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+          <div className="bg-white rounded-xl p-4 shadow-md flex items-start gap-3">
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <QrCode className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Custom QR Codes</h3>
+              <p className="text-sm text-gray-600">Generate and manage custom payment QR codes for your business</p>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl p-4 shadow-md flex items-start gap-3">
+            <div className="bg-purple-100 p-2 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Transaction Reports</h3>
+              <p className="text-sm text-gray-600">Monitor all incoming payments and transaction history</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

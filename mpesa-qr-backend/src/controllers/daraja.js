@@ -38,10 +38,10 @@ async function generateAccessToken() {
       }
     );
 
-    console.log('✅ Access token generated successfully');
+    console.log('Access token generated successfully');
     return response.data.access_token;
   } catch (error) {
-    console.error('💥 Access token generation failed:', error.response?.data || error.message);
+    console.error('Access token generation failed:', error.response?.data || error.message);
     return null;
   }
 }
@@ -49,7 +49,7 @@ async function generateAccessToken() {
 // Health check endpoint
 async function healthCheck(req, res) {
   try {
-    console.log('🏥 Health check requested');
+    console.log('Health check requested');
     
     const accessToken = await generateAccessToken();
     const tokenStatus = accessToken ? 'valid' : 'failed';
@@ -96,7 +96,7 @@ async function testMpesaConnection(req, res) {
       throw new Error('Failed to generate access token');
     }
   } catch (error) {
-    console.error('💥 M-Pesa connection test failed:', error);
+    console.error('M-Pesa connection test failed:', error);
     res.status(500).json({
       success: false,
       message: 'M-Pesa API connection failed',
@@ -143,16 +143,24 @@ async function testRegister(req, res) {
   }
 }
 
-// ✅ ENHANCED: Customer payment function with proper merchant linking
+// ✅ ENHANCED: Customer payment function with dynamic amount support
 async function triggerCustomerPayment(req, res) {
   console.log('💰 Customer payment initiated');
   const { phoneNumber, amount, qrData } = req.body;
   
   // Validate required fields
-  if (!phoneNumber || !amount || !qrData) {
+  if (!phoneNumber || !qrData) {
     return res.status(400).json({
       success: false,
-      message: 'Missing required fields: phoneNumber, amount, qrData'
+      message: 'Missing required fields: phoneNumber, qrData'
+    });
+  }
+
+  // Check if amount is provided or if it's a dynamic amount QR code
+  if (!amount && !qrData.dynamicAmount) {
+    return res.status(400).json({
+      success: false,
+      message: 'Amount is required for non-dynamic QR codes'
     });
   }
 
@@ -308,6 +316,7 @@ async function triggerCustomerPayment(req, res) {
         paymentType: 'customer_initiated',
         source: 'qr_scanner',
         isValidMerchant: isValidMerchant, // ✅ Mark if this is a real merchant
+        isDynamicAmount: qrData.dynamicAmount || false, // ✅ Track if this was a dynamic amount transaction
         
         // ✅ NEW: Guest merchant tracking for dashboard queries
         ...(isValidMerchant ? {} : {
@@ -343,6 +352,7 @@ async function triggerCustomerPayment(req, res) {
         merchantId,
         isValidMerchant,
         businessName,
+        isDynamicAmount: qrData.dynamicAmount || false,
         checkoutRequestID: response.data.CheckoutRequestID
       });
 
@@ -382,6 +392,7 @@ async function triggerCustomerPayment(req, res) {
         paymentType: 'customer_initiated',
         source: 'qr_scanner',
         isValidMerchant: isValidMerchant,
+        isDynamicAmount: qrData.dynamicAmount || false,
         mpesaResponse: response.data,
         ...(isValidMerchant ? {} : {
           guestMerchantInfo: {
@@ -646,7 +657,8 @@ async function triggerSTKPush(req, res) {
       // Additional metadata
       paymentType: 'merchant_initiated',
       source: 'merchant_dashboard',
-      isValidMerchant: true
+      isValidMerchant: true,
+      isDynamicAmount: false
     };
 
     const docRef = await db.collection('transactions').add(transactionData);
@@ -730,6 +742,7 @@ async function createTestTransaction(req, res) {
       source: 'test_endpoint',
       paymentType: 'test',
       isValidMerchant: true,
+      isDynamicAmount: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       mpesaResponse: {
@@ -760,18 +773,11 @@ async function createTestTransaction(req, res) {
   }
 }
 
-// Generate QR code for merchant
+// ✅ UPDATED: Generate QR code for merchant with support for dynamic amounts
 async function generateMerchantQR(req, res) {
   try {
     const merchantId = req.user.uid;
-    const { amount, description, reference, businessName } = req.body;
-
-    if (!amount || parseFloat(amount) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid amount is required'
-      });
-    }
+    const { description, reference, businessName, dynamicAmount = true } = req.body;
 
     // Get merchant info
     let merchantData = null;
@@ -796,27 +802,26 @@ async function generateMerchantQR(req, res) {
       merchantId: merchantId,
       businessName: businessName || merchantData?.name || 'Merchant Store',
       businessShortCode: process.env.MPESA_SHORTCODE,
-      amount: parseFloat(amount),
       description: description || 'Payment',
       reference: reference || `QR_${Date.now()}`,
       timestamp: new Date().toISOString(),
       version: '1.0',
-      type: 'merchant_payment'
+      type: 'merchant_payment',
+      dynamicAmount: dynamicAmount // New field indicating customer should enter amount
     };
 
-    console.log('✅ QR Code generated for merchant:', merchantId);
+    console.log('✅ Dynamic QR Code generated for merchant:', merchantId);
 
     res.status(200).json({
-      success: true,
-      message: 'QR Code generated successfully',
-      data: {
-        qrData: qrData,
-        qrString: JSON.stringify(qrData),
-        merchantId: merchantId,
-        businessName: qrData.businessName,
-        amount: qrData.amount
-      }
-    });
+  success: true,
+  message: 'QR Code generated successfully',
+  data: {
+    qrData: JSON.stringify(qrData), // <-- FIXED: now a string
+    merchantId: merchantId,
+    businessName: qrData.businessName,
+    dynamicAmount: dynamicAmount
+  }
+});
 
   } catch (error) {
     console.error('💥 QR generation error:', error);
@@ -850,6 +855,7 @@ module.exports = {
 console.log('✅ daraja.js module loaded successfully with all fixes applied');
 console.log('🔧 Fixed issues:');
 console.log('   - Enhanced customer payment merchant linking');
+console.log('   - Added support for dynamic amount QR codes');
 console.log('   - Improved callback transaction lookup and updates');
 console.log('   - Better transaction categorization and metadata');
 console.log('   - Comprehensive merchant validation');

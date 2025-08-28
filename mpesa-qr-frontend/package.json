@@ -7,17 +7,26 @@
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "assert": "^2.1.0",
     "axios": "^1.11.0",
+    "browserify-zlib": "^0.2.0",
     "firebase": "^12.0.0",
     "html5-qrcode": "^2.3.8",
+    "https-browserify": "^1.0.0",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.536.0",
     "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4",
+    "qrcode.react": "^3.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^7.7.1",
     "react-scripts": "5.0.1",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
+    "url": "^0.11.4",
+    "util": "^0.12.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -47,6 +56,7 @@
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
+    "react-app-rewired": "^2.2.1",
     "tailwindcss": "^3.4.17"
   }
 }

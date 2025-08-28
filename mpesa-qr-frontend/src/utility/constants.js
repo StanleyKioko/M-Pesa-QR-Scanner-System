@@ -3,7 +3,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 const useNgrok = process.env.REACT_APP_USE_NGROK === 'true';
 
 export const API_BASE_URL = useNgrok 
-  ? process.env.REACT_APP_NGROK_URL || 'https://333323a0a07c.ngrok-free.app'
+  ? process.env.REACT_APP_NGROK_URL || 'https://3938e255c6df.ngrok-free.app'
   : process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
 
 // Payment Status Constants
