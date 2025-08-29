@@ -37,6 +37,7 @@ import {
 import axios from 'axios';
 import { API_BASE_URL } from '../utility/constants';
 import { useAuth } from '../hooks/useAuth';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const MerchantDashboard = () => {
   const { user, merchantData, logout } = useAuth();
@@ -225,6 +226,15 @@ const MerchantDashboard = () => {
     failedPayments: 0,
     successRate: 0
   };
+
+  // Add dailyData for chart
+  const dailyData = analytics?.dailySummaries?.map(day => ({
+    date: day.dateFormatted,
+    revenue: day.totalRevenue,
+    successful: day.successful,
+    failed: day.failed,
+    pending: day.pending,
+  })) || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -527,6 +537,32 @@ const MerchantDashboard = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Chart: Revenue Trend (Last 7 Days) */}
+            {dailyData.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5" />
+                    Revenue Trend (Last 7 Days)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={dailyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" />
+                      <Bar dataKey="successful" fill="#22c55e" name="Successful" />
+                      <Bar dataKey="failed" fill="#ef4444" name="Failed" />
+                      <Bar dataKey="pending" fill="#f59e42" name="Pending" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Daily Summary */}
             {analytics?.dailySummaries?.length > 0 && (
               <Card>

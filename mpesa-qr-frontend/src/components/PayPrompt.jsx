@@ -104,22 +104,22 @@ const PayPrompt = () => {
                 />
               </div>
             )}
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'Processing...' : 'Pay with STK Push'}
+            <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700">
+              {loading ? 'Processing...' : 'Pay Direct'}
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="w-full mt-2"
+              className="w-full bg-green-600 hover:bg-green-700"
               onClick={() => {
                 window.location.href = mpesaAppUrl;
               }}
             >
-              Pay with M-Pesa App
+              Proceed with M-Pesa App
             </Button>
           </form>
           {error && (
-            <div className="mt-4 flex items-center gap-2 text-red-600 text-sm">
+            <div className="mt-4 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" /> {error}
             </div>
           )}
