@@ -7,6 +7,8 @@ const app = express();
 const authRoutes = require('./routes/auth');
 const darajaRoutes = require('./routes/daraja');
 const transactionRoutes = require('./routes/transactions');
+const qrPayRouter = require('./routes/qrPay');
+app.use(qrPayRouter);
 
 // Enhanced CORS configuration
 app.use(cors({

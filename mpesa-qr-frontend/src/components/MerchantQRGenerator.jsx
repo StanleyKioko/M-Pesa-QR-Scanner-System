@@ -64,24 +64,24 @@ const MerchantQRGenerator = () => {
       if (response.ok && result.success) {
         setQrData(result.data);
 
-        // Check if qrData is present and valid
+        // Use qrUrl from backend as the QR code value
         if (
           !result.data ||
-          !result.data.qrData ||
-          typeof result.data.qrData !== 'string' ||
-          result.data.qrData.trim() === ''
+          !result.data.qrUrl ||
+          typeof result.data.qrUrl !== 'string' ||
+          result.data.qrUrl.trim() === ''
         ) {
-          console.error('Invalid qrData received from backend:', result.data);
+          console.error('Invalid qrUrl received from backend:', result.data);
           setError('QR code data is missing or invalid from server.');
           setLoading(false);
           return;
         }
 
         try {
-          const qrImageUrl = await generateQRCodeImage(result.data.qrData, '400x400');
+          const qrImageUrl = await generateQRCodeImage(result.data.qrUrl, '400x400');
           setQrCodeUrl(qrImageUrl);
         } catch (imgErr) {
-          console.error('Error generating QR code image:', imgErr, 'qrData:', result.data.qrData);
+          console.error('Error generating QR code image:', imgErr, 'qrUrl:', result.data.qrUrl);
           setError('QR code generated but failed to render image. (Invalid QR data)');
           return;
         }
@@ -143,7 +143,8 @@ const MerchantQRGenerator = () => {
     }
 
     try {
-      const qrImageUrl = await generateQRCodeImage(qrData.qrData, '400x400');
+      // Use qrUrl for download as well
+      const qrImageUrl = await generateQRCodeImage(qrData.qrUrl, '400x400');
       
       const link = document.createElement('a');
       link.href = qrImageUrl;

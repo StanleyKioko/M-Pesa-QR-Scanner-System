@@ -798,6 +798,7 @@ async function generateMerchantQR(req, res) {
       console.log('Could not fetch merchant data:', error.message);
     }
 
+    // Prepare QR data as query params
     const qrData = {
       merchantId: merchantId,
       businessName: businessName || merchantData?.name || 'Merchant Store',
@@ -810,18 +811,24 @@ async function generateMerchantQR(req, res) {
       dynamicAmount: dynamicAmount // New field indicating customer should enter amount
     };
 
-    console.log('Dynamic QR Code generated for merchant:', merchantId);
+    // Build the QR code URL (for the frontend /pay page)
+    // Make sure to set FRONTEND_URL in your .env, e.g. https://your-frontend.com
+    const frontendBaseUrl = process.env.FRONTEND_URL || "http://localhost:3001";
+    const params = new URLSearchParams(qrData).toString();
+    const qrUrl = `${frontendBaseUrl}/pay?${params}`;
+
+    console.log('Dynamic QR Code URL generated for merchant:', qrUrl);
 
     res.status(200).json({
-  success: true,
-  message: 'QR Code generated successfully',
-  data: {
-    qrData: JSON.stringify(qrData), // <-- FIXED: now a string
-    merchantId: merchantId,
-    businessName: qrData.businessName,
-    dynamicAmount: dynamicAmount
-  }
-});
+      success: true,
+      message: 'QR Code generated successfully',
+      data: {
+        qrUrl, // <-- This is what you should encode as the QR code
+        merchantId: merchantId,
+        businessName: qrData.businessName,
+        dynamicAmount: dynamicAmount
+      }
+    });
 
   } catch (error) {
     console.error('QR generation error:', error);

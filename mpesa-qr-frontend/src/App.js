@@ -9,6 +9,7 @@ import PublicQRScanner from './components/PublicQRScanner';
 import Transactions from './components/Transactions';
 import QRPaymentScanner from './components/QRPaymentScanner';
 import PrivateRoute from './utility/PrivateRoute';
+import PayPrompt from "./components/PayPrompt";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           
           {/* Public routes */}
           <Route path="/scan" element={<PublicQRScanner />} />
+          <Route path="/pay" element={<PayPrompt />} />
           
           {/* Protected routes */}
           <Route 
