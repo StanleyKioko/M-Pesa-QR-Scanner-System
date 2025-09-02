@@ -6,9 +6,9 @@ const { getTransactionByCheckoutRequestID } = require('./transactions');
 
 // Set base URL depending on environment
 const MPESA_BASE_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://api.safaricom.co.ke'
-    : 'https://sandbox.safaricom.co.ke';
+  process.env.NODE_ENV === 'sandbox' || process.env.NODE_ENV === 'development'
+    ? 'https://sandbox.safaricom.co.ke'
+    : 'https://api.safaricom.co.ke';
 
 // Helper to check required env vars
 function checkEnvVars() {

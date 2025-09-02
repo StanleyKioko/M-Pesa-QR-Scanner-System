@@ -691,7 +691,7 @@ const MerchantDashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* QR Scanner */}
+              {/* QR Scanner 
               <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleNavigateToScanner}>
                 <CardContent className="p-6 text-center">
                   <div className="bg-blue-100 p-4 rounded-full w-fit mx-auto mb-4">
@@ -706,15 +706,15 @@ const MerchantDashboard = () => {
                     Open Scanner
                   </Button>
                 </CardContent>
-              </Card>
+              </Card> */}
 
               {/* Export Data */}
-              <Card className="hover:shadow-lg transition-shadow">
+              <Card className="bg-green-100 p-4 rounded-full w-fit mx-auto mb-4w">
                 <CardContent className="p-6 text-center">
                   <div className="bg-purple-100 p-4 rounded-full w-fit mx-auto mb-4">
                     <Download className="w-8 h-8 text-purple-600" />
                   </div>
-                  <h3 className="font-semibold text-lg mb-2">Export Data</h3>
+                  <h3 className="font-semibold text-lg mb-2 bg">Export Data</h3>
                   <p className="text-gray-600 text-sm mb-4">
                     Download your transaction data as CSV
                   </p>
