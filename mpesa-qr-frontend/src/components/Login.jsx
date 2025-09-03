@@ -227,7 +227,7 @@ const Login = ({ onNavigateToRegister }) => {
                   Don't have an account yet?{' '}
                   <button
                     type="button"
-                    onClick={onNavigateToRegister}
+                    onClick={() => navigate('/register')}
                     className="text-blue-600 hover:text-blue-800 font-medium"
                   >
                     Register your business

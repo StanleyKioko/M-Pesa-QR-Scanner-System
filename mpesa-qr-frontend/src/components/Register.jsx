@@ -8,6 +8,7 @@ import Label from './ui/Label';
 import { ArrowLeft, Building, AlertCircle, CheckCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utility/constants';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 function Register({ onNavigateToLogin, onRegistrationSuccess }) {
   const [formData, setFormData] = useState({
@@ -22,6 +23,9 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const navigate = useNavigate();
+
 
   const handleChange = (e) => {
     setFormData({
@@ -310,7 +314,7 @@ function Register({ onNavigateToLogin, onRegistrationSuccess }) {
                 <Button
                   type="button"
                   variant="link"
-                  onClick={handleBackToLogin}
+                  onClick={() => navigate('/login')}
                   disabled={loading}
                   className="text-sm text-blue-600 hover:text-blue-800"
                 >
